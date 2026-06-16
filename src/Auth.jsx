@@ -12,7 +12,7 @@ function Auth({ user, onAuthChange }) {
       password,
     })
 
-    setMessage(error ? error.message : "Account created! Check your email.")
+    setMessage(error ? error.message : "Account created! Log in to Continue!")
     onAuthChange()
   }
 

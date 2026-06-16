@@ -955,6 +955,167 @@ ${review.vibeCheck}`
     image.src = svgUrl
   }
 
+
+  function getAchievementGraphicData(achievement = {}, groupTitle = "Achievement") {
+    const safeAchievement = achievement && typeof achievement === "object" ? achievement : {}
+    const current = Number(safeAchievement.current || 0)
+    const target = Number(safeAchievement.target || 0)
+    const unlocked = target ? current >= target : true
+    const progressPercent = target ? Math.min(100, Math.round((current / target) * 100)) : 100
+    const cleanedGroupTitle = String(groupTitle || "Achievement").replace(/^[^A-Za-z0-9]+\s*/, "")
+
+    return {
+      icon: safeAchievement.icon || "🏆",
+      name: safeAchievement.name || "Achievement Unlocked",
+      description: safeAchievement.description || "Unlocked in Brain Chemistry Books.",
+      groupTitle: cleanedGroupTitle,
+      current,
+      target,
+      unlocked,
+      progressPercent,
+    }
+  }
+
+  function buildAchievementGraphicSvg(achievement, groupTitle = "Achievement") {
+    const data = getAchievementGraphicData(achievement, groupTitle)
+    const width = 1080
+    const height = 1080
+    const nameLines = getWrappedSvgLines(data.name.toUpperCase(), 19, 3)
+    const descriptionLines = getWrappedSvgLines(data.description, 34, 4)
+    const progressText = data.target
+      ? `${Math.min(data.current, data.target)} / ${data.target}`
+      : "Unlocked"
+    const safeGroupTitle = escapeSvgText(data.groupTitle.toUpperCase())
+
+    const nameSvg = nameLines
+      .map((line, index) => `<text x="540" y="${438 + index * 58}" class="badge-title" text-anchor="middle">${escapeSvgText(line)}</text>`)
+      .join("")
+
+    const descriptionSvg = descriptionLines
+      .map((line, index) => `<text x="540" y="${655 + index * 34}" class="badge-copy" text-anchor="middle">${escapeSvgText(line)}</text>`)
+      .join("")
+
+    return `
+      <svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
+        <defs>
+          <filter id="badgeShadow" x="-20%" y="-20%" width="140%" height="140%">
+            <feDropShadow dx="0" dy="12" stdDeviation="12" flood-color="#2F2420" flood-opacity="0.22" />
+          </filter>
+          <pattern id="tinyDots" width="34" height="34" patternUnits="userSpaceOnUse">
+            <circle cx="7" cy="8" r="2" fill="#A65434" opacity="0.13" />
+            <circle cx="25" cy="24" r="1.6" fill="#4B3A32" opacity="0.10" />
+          </pattern>
+          <style>
+            .kicker { font: 800 30px Georgia, serif; fill: #F3E9DD; letter-spacing: 5px; }
+            .label { font: 800 27px Georgia, serif; fill: #A65434; letter-spacing: 4px; }
+            .badge-title { font: 900 55px Georgia, serif; fill: #2F2420; letter-spacing: 1px; }
+            .badge-copy { font: 500 27px Georgia, serif; fill: #4B3A32; }
+            .small { font: 800 24px Georgia, serif; fill: #4B3A32; letter-spacing: 2px; }
+            .progress { font: 800 31px Georgia, serif; fill: #2F2420; }
+            .footer { font: 700 20px Georgia, serif; fill: #F3E9DD; letter-spacing: 2px; }
+          </style>
+        </defs>
+
+        <rect width="1080" height="1080" fill="#E6DED4" />
+        <rect width="1080" height="1080" fill="url(#tinyDots)" />
+        <path d="M76 96 C210 58 336 82 462 62 C611 39 718 91 860 68 C946 54 1004 71 1026 96 L1006 1000 C872 1030 758 1000 629 1022 C486 1046 363 1001 219 1023 C134 1036 87 1015 62 989 Z" fill="#F3E9DD" filter="url(#badgeShadow)" />
+        <path d="M91 120 C230 88 333 111 466 91 C612 69 716 117 852 96 C932 84 982 98 1005 118 L986 975 C856 1000 745 973 623 994 C487 1018 369 976 232 997 C150 1009 109 990 86 966 Z" fill="#FFF8EE" opacity="0.58" />
+
+        <rect x="210" y="105" width="660" height="68" rx="7" fill="#2F2420" transform="rotate(-1 540 139)" />
+        <text x="540" y="150" class="kicker" text-anchor="middle">ACHIEVEMENT UNLOCKED</text>
+
+        <g transform="rotate(-4 540 277)">
+          <rect x="381" y="202" width="318" height="156" rx="22" fill="#C29A5A" opacity="0.25" />
+          <rect x="401" y="222" width="278" height="116" rx="18" fill="#A65434" opacity="0.16" />
+          <text x="540" y="310" font-size="94" text-anchor="middle">${escapeSvgText(data.icon)}</text>
+        </g>
+
+        <text x="540" y="392" class="label" text-anchor="middle">${safeGroupTitle}</text>
+        ${nameSvg}
+
+        <line x1="226" y1="575" x2="854" y2="575" stroke="#A65434" stroke-width="4" stroke-opacity="0.28" stroke-dasharray="10 10" />
+        ${descriptionSvg}
+
+        <g transform="translate(210 800)">
+          <text x="330" y="0" class="small" text-anchor="middle">PROGRESS</text>
+          <rect x="0" y="28" width="660" height="42" rx="21" fill="#E6DED4" stroke="#4B3A32" stroke-opacity="0.16" />
+          <rect x="0" y="28" width="${Math.max(18, Math.round(660 * data.progressPercent / 100))}" height="42" rx="21" fill="#A65434" opacity="0.82" />
+          <text x="330" y="112" class="progress" text-anchor="middle">${escapeSvgText(progressText)} • ${data.progressPercent}%</text>
+        </g>
+
+        <g transform="rotate(3 197 218)">
+          <rect x="121" y="195" width="152" height="34" rx="4" fill="#B56B6B" opacity="0.48" />
+        </g>
+        <g transform="rotate(-6 887 849)">
+          <rect x="803" y="831" width="168" height="35" rx="4" fill="#7A8C6A" opacity="0.42" />
+        </g>
+        <text x="165" y="886" font-size="54" opacity="0.38">✦</text>
+        <text x="888" y="265" font-size="48" opacity="0.35">♡</text>
+
+        <rect x="290" y="975" width="500" height="54" rx="5" fill="#2F2420" transform="rotate(-1 540 1002)" />
+        <text x="540" y="1010" class="footer" text-anchor="middle" textLength="330" lengthAdjust="spacingAndGlyphs">READ • RATE • ROMANTICIZE ♡</text>
+      </svg>`
+  }
+
+  function getAchievementGraphicDataUrl(achievement, groupTitle = "Achievement") {
+    return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(buildAchievementGraphicSvg(achievement, groupTitle))}`
+  }
+
+  function downloadAchievementGraphicSvg(achievement = {}, groupTitle = "Achievement") {
+    const data = getAchievementGraphicData(achievement, groupTitle)
+    const svg = buildAchievementGraphicSvg(data, groupTitle)
+    const blob = new Blob([svg], { type: "image/svg+xml;charset=utf-8" })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement("a")
+    link.href = url
+    link.download = `${getSafeFileName(data.name || "achievement")}-achievement.svg`
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    URL.revokeObjectURL(url)
+  }
+
+  function downloadAchievementGraphicPng(achievement = {}, groupTitle = "Achievement") {
+    const data = getAchievementGraphicData(achievement, groupTitle)
+    const svg = buildAchievementGraphicSvg(data, groupTitle)
+    const svgBlob = new Blob([svg], { type: "image/svg+xml;charset=utf-8" })
+    const svgUrl = URL.createObjectURL(svgBlob)
+    const image = new Image()
+
+    image.onload = () => {
+      const canvas = document.createElement("canvas")
+      canvas.width = 1080
+      canvas.height = 1080
+      const context = canvas.getContext("2d")
+
+      if (!context) {
+        URL.revokeObjectURL(svgUrl)
+        downloadAchievementGraphicSvg(data, groupTitle)
+        setSaveMessage("PNG download had trouble, so I downloaded an SVG backup instead.")
+        return
+      }
+
+      context.fillStyle = "#E6DED4"
+      context.fillRect(0, 0, canvas.width, canvas.height)
+      context.drawImage(image, 0, 0)
+
+      const link = document.createElement("a")
+      link.download = `${getSafeFileName(data.name || "achievement")}-achievement.png`
+      link.href = canvas.toDataURL("image/png")
+      link.click()
+      URL.revokeObjectURL(svgUrl)
+      setSaveMessage("Achievement graphic downloaded 🏆")
+    }
+
+    image.onerror = () => {
+      URL.revokeObjectURL(svgUrl)
+      setSaveMessage("PNG download had trouble, so I downloaded an SVG backup instead.")
+      downloadAchievementGraphicSvg(data, groupTitle)
+    }
+
+    image.src = svgUrl
+  }
+
   function buildReviewCaption(reviewItem, platform = "instagram") {
     if (!reviewItem) return ""
 
@@ -1311,10 +1472,299 @@ ${review.vibeCheck}`
     }
   }
 
+
+
+  function getAchievementStats() {
+    const totalPagesLogged = readingAnalyticsStats.totalPages || 0
+    const finishedBookCount = finishedReviews.length
+    const reviewCount = finishedReviews.length
+    const longestReadingStreak = readingStreakStats.longestStreak || 0
+    const averageRatingValue = Number(averageRating) || 0
+    const averageSpiceValue = Number(averageSpice) || 0
+
+    const countFinishedTropeMatches = (matchers) => {
+      const matcherList = Array.isArray(matchers) ? matchers : [matchers]
+
+      return finishedReviews.filter((item) => {
+        const itemTropes = Array.isArray(item.tropes) ? item.tropes : []
+        return itemTropes.some((trope) => {
+          const normalizedTrope = String(trope || "").toLowerCase()
+          return matcherList.some((matcher) => normalizedTrope.includes(String(matcher).toLowerCase()))
+        })
+      }).length
+    }
+
+    const finishedAuthorCounts = {}
+
+    finishedReviews.forEach((item) => {
+      const author = item.bookInfo.author || "Unknown Author"
+      finishedAuthorCounts[author] = (finishedAuthorCounts[author] || 0) + 1
+    })
+
+    const authorEraAchievements = Object.entries(finishedAuthorCounts)
+      .filter(([author]) => author && author !== "Unknown Author")
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 8)
+      .map(([author, count]) => ({
+        id: `author-era-${author.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`,
+        icon: "📚",
+        name: `Author Era: ${author}`,
+        description: `Read 10 finished books by ${author}.`,
+        current: count,
+        target: 10,
+      }))
+
+    const achievementGroups = [
+      {
+        title: "📚 Books Finished",
+        achievements: [
+          {
+            id: "first-chapter",
+            icon: "📖",
+            name: "First Chapter",
+            description: "Finish your first book.",
+            current: finishedBookCount,
+            target: 1,
+          },
+          {
+            id: "bookworm",
+            icon: "🐛",
+            name: "Bookworm",
+            description: "Finish 10 books.",
+            current: finishedBookCount,
+            target: 10,
+          },
+          {
+            id: "devourer",
+            icon: "🍽️",
+            name: "Devourer",
+            description: "Finish 25 books.",
+            current: finishedBookCount,
+            target: 25,
+          },
+          {
+            id: "bibliophile",
+            icon: "📚",
+            name: "Bibliophile",
+            description: "Finish 50 books.",
+            current: finishedBookCount,
+            target: 50,
+          },
+          {
+            id: "reading-machine",
+            icon: "⚙️",
+            name: "Reading Machine",
+            description: "Finish 100 books.",
+            current: finishedBookCount,
+            target: 100,
+          },
+        ],
+      },
+      {
+        title: "🔥 Reading Streaks",
+        achievements: [
+          {
+            id: "just-getting-started",
+            icon: "🔥",
+            name: "Just Getting Started",
+            description: "Log reading 2 days in a row.",
+            current: longestReadingStreak,
+            target: 2,
+          },
+          {
+            id: "building-momentum",
+            icon: "🚂",
+            name: "Building Momentum",
+            description: "Reach a 7-day reading streak.",
+            current: longestReadingStreak,
+            target: 7,
+          },
+          {
+            id: "habit-formed",
+            icon: "🗓️",
+            name: "Habit Formed",
+            description: "Reach a 30-day reading streak.",
+            current: longestReadingStreak,
+            target: 30,
+          },
+          {
+            id: "dedicated-reader",
+            icon: "🏆",
+            name: "Dedicated Reader",
+            description: "Reach a 100-day reading streak.",
+            current: longestReadingStreak,
+            target: 100,
+          },
+        ],
+      },
+      {
+        title: "📄 Pages Read",
+        achievements: [
+          {
+            id: "turning-pages",
+            icon: "📄",
+            name: "Turning Pages",
+            description: "Log 1,000 pages read.",
+            current: totalPagesLogged,
+            target: 1000,
+          },
+          {
+            id: "page-slayer",
+            icon: "⚔️",
+            name: "Page Slayer",
+            description: "Log 5,000 pages read.",
+            current: totalPagesLogged,
+            target: 5000,
+          },
+          {
+            id: "marathon-reader",
+            icon: "🏃‍♀️",
+            name: "Marathon Reader",
+            description: "Log 10,000 pages read.",
+            current: totalPagesLogged,
+            target: 10000,
+          },
+          {
+            id: "library-conqueror",
+            icon: "🏰",
+            name: "Library Conqueror",
+            description: "Log 25,000 pages read.",
+            current: totalPagesLogged,
+            target: 25000,
+          },
+        ],
+      },
+      {
+        title: "⭐ Reviews",
+        achievements: [
+          {
+            id: "first-thoughts",
+            icon: "💭",
+            name: "First Thoughts",
+            description: "Save your first finished review.",
+            current: reviewCount,
+            target: 1,
+          },
+          {
+            id: "critic",
+            icon: "📝",
+            name: "Critic",
+            description: "Save 25 finished reviews.",
+            current: reviewCount,
+            target: 25,
+          },
+          {
+            id: "reviewer-extraordinaire",
+            icon: "🌟",
+            name: "Reviewer Extraordinaire",
+            description: "Save 100 finished reviews.",
+            current: reviewCount,
+            target: 100,
+          },
+        ],
+      },
+      {
+        title: "💘 Romance Reader",
+        achievements: [
+          {
+            id: "small-town-sweetheart",
+            icon: "🏡",
+            name: "Small Town Sweetheart",
+            description: "Finish 5 Small Town romances.",
+            current: countFinishedTropeMatches("small town"),
+            target: 5,
+          },
+          {
+            id: "sunshine-collector",
+            icon: "☀️",
+            name: "Sunshine Collector",
+            description: "Finish 5 Grumpy/Sunshine romances.",
+            current: countFinishedTropeMatches(["grumpy", "sunshine"]),
+            target: 5,
+          },
+          {
+            id: "found-family-fanatic",
+            icon: "👨‍👩‍👧",
+            name: "Found Family Fanatic",
+            description: "Finish 5 Found Family romances.",
+            current: countFinishedTropeMatches("found family"),
+            target: 5,
+          },
+          {
+            id: "fake-dating-enthusiast",
+            icon: "💌",
+            name: "Fake Dating Enthusiast",
+            description: "Finish 5 Fake Dating romances.",
+            current: countFinishedTropeMatches("fake dating"),
+            target: 5,
+          },
+          {
+            id: "spice-enthusiast",
+            icon: "🌶️",
+            name: "Spice Enthusiast",
+            description: "Maintain a 3.0+ average spice rating.",
+            current: averageSpiceValue,
+            target: 3,
+          },
+          {
+            id: "fire-alarm-activated",
+            icon: "🚨",
+            name: "Fire Alarm Activated",
+            description: "Maintain a 4.0+ average spice rating.",
+            current: averageSpiceValue,
+            target: 4,
+          },
+          {
+            id: "impossible-standards",
+            icon: "⭐",
+            name: "Impossible Standards",
+            description: "Maintain a 4.5+ average rating.",
+            current: averageRatingValue,
+            target: 4.5,
+          },
+        ],
+      },
+      {
+        title: "📚 Repeatable Achievements",
+        achievements: authorEraAchievements.length
+          ? authorEraAchievements
+          : [
+              {
+                id: "author-era-placeholder",
+                icon: "📚",
+                name: "Author Era",
+                description: "Read 10 finished books by the same author.",
+                current: 0,
+                target: 10,
+              },
+            ],
+      },
+    ]
+
+    const allAchievements = achievementGroups.flatMap((group) => group.achievements)
+    const unlockedAchievements = allAchievements.filter(
+      (achievement) => Number(achievement.current || 0) >= achievement.target
+    )
+
+    return {
+      groups: achievementGroups,
+      total: allAchievements.length,
+      unlocked: unlockedAchievements.length,
+      nextAchievement: allAchievements
+        .filter((achievement) => Number(achievement.current || 0) < achievement.target)
+        .sort((a, b) => {
+          const aPercent = a.target ? Number(a.current || 0) / a.target : 0
+          const bPercent = b.target ? Number(b.current || 0) / b.target : 0
+          return bPercent - aPercent
+        })[0],
+    }
+  }
+
   const readingStreakStats = getReadingStreakStats()
   const readingAnalyticsStats = getReadingAnalyticsStats()
   const readingCalendarStats = getReadingCalendarStats(calendarMonthKey)
   const readingGoalStats = getReadingGoalStats()
+  const achievementStats = getAchievementStats()
 
   const currentYear = new Date().getFullYear()
 
@@ -2320,6 +2770,76 @@ ${percent}%`
 
             <p>{readingGoalStats.minutesThisYear} / {readingGoals.minutes || 0} minutes read ({readingGoalStats.hoursThisYear} hours)</p>
             <ProgressBar percent={readingGoalStats.minutesPercent} />
+          </div>
+
+          <div className="score-card">
+            <p>🏆 Achievements</p>
+            <h2>{achievementStats.unlocked} / {achievementStats.total} unlocked</h2>
+            <ProgressBar percent={achievementStats.total ? Math.round((achievementStats.unlocked / achievementStats.total) * 100) : 0} />
+
+            {achievementStats.nextAchievement && (
+              <p>
+                Next up: {achievementStats.nextAchievement.icon} {achievementStats.nextAchievement.name} ({Math.min(Number(achievementStats.nextAchievement.current || 0), achievementStats.nextAchievement.target)} / {achievementStats.nextAchievement.target})
+              </p>
+            )}
+
+            {achievementStats.groups.map((group) => (
+              <div key={group.title} style={{ marginTop: "1.5rem" }}>
+                <h3>{group.title}</h3>
+
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+                    gap: "1rem",
+                  }}
+                >
+                  {group.achievements.map((achievement) => {
+                    const current = Number(achievement.current || 0)
+                    const unlocked = current >= achievement.target
+                    const progressPercent = achievement.target
+                      ? Math.min(100, Math.round((current / achievement.target) * 100))
+                      : 0
+
+                    return (
+                      <div
+                        key={achievement.id}
+                        style={{
+                          border: unlocked
+                            ? "2px solid rgba(166, 84, 52, 0.75)"
+                            : "1px solid rgba(47, 36, 32, 0.18)",
+                          borderRadius: "1rem",
+                          padding: "1rem",
+                          background: unlocked
+                            ? "rgba(166, 84, 52, 0.14)"
+                            : "rgba(255, 255, 255, 0.45)",
+                        }}
+                      >
+                        <p style={{ fontSize: "2rem", margin: 0 }}>
+                          {unlocked ? achievement.icon : "🔒"}
+                        </p>
+                        <h4 style={{ marginBottom: "0.25rem" }}>{achievement.name}</h4>
+                        <p>{achievement.description}</p>
+                        <p>
+                          {unlocked ? "Unlocked ✅" : `${Math.min(current, achievement.target)} / ${achievement.target}`}
+                        </p>
+                        <ProgressBar percent={progressPercent} />
+                        {unlocked && achievement.id !== "author-era-placeholder" && (
+                          <button
+                            type="button"
+                            className="secondary-button"
+                            style={{ marginTop: "0.75rem", width: "100%" }}
+                            onClick={() => downloadAchievementGraphicPng(achievement, group.title)}
+                          >
+                            🎨 Download Badge Graphic
+                          </button>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            ))}
           </div>
 
           <div className="score-card">
