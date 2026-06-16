@@ -1,4 +1,6 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { supabase } from "./lib/supabase"
+import Auth from "./Auth"
 import "./App.css"
 
 const tropeOptions = [
@@ -20,6 +22,7 @@ const tropeOptions = [
 
 function App() {
   const [step, setStep] = useState("home")
+  const [user, setUser] = useState(null)
   const [selectedReview, setSelectedReview] = useState(null)
   const [editingReviewId, setEditingReviewId] = useState(null)
   const [libraryFilter, setLibraryFilter] = useState("all")
@@ -79,13 +82,9 @@ function App() {
   const [isFavorite, setIsFavorite] = useState(false)
   const [saveMessage, setSaveMessage] = useState("")
 
-  const filteredReviews = savedReviews.filter((item) => {
-    if (libraryFilter === "favorites") return item.isFavorite
-    if (libraryFilter === "reading") return item.bookInfo.status === "Reading"
-    if (libraryFilter === "finished") return item.bookInfo.status === "Finished"
-    if (libraryFilter === "dnf") return item.bookInfo.status === "DNF"
-    return true
-  })
+  const filteredReviews = savedReviews.filter((item) =>
+    libraryFilter === "favorites" ? item.isFavorite : true
+  )
 
   const totalBooks = savedReviews.length
   const finishedReviews = savedReviews.filter(
@@ -494,104 +493,27 @@ ${percent}%`
     )
   }
 
-  function startReviewFromReading(reviewItem) {
-    setBookInfo({
-      ...reviewItem.bookInfo,
-      status: "Finished",
-    })
+  async function loadUser() {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
 
-    setDnfInfo({
-      percent: "",
-      reason: "",
-      wouldReadAuthorAgain: "Maybe",
-    })
-
-    setScores({
-      plot: 0,
-      vibe: 0,
-      characters: 0,
-      writingStyle: 0,
-      enjoyability: 0,
-    })
-
-    setMetrics({
-      spice: 0,
-      chemistry: 0,
-      tension: 0,
-      emotionalDamage: 0,
-      bookHangover: 0,
-      contentIntensity: 0,
-    })
-
-    setReview({
-      oneSentenceReview: "",
-      favoriteThing: "",
-      biggestComplaint: "",
-      vibeCheck: "",
-    })
-
-    setTropes([])
-    setObsessionScore(5)
-    setRecommendationLevel("Recommend")
-    setIsFavorite(false)
-    setEditingReviewId(reviewItem.id)
-    setSelectedReview(null)
-    setSaveMessage("")
-    setStep(1)
+    setUser(user)
   }
 
-  function dnfFromReading(reviewItem) {
-    const progressPercent = getProgressPercent(reviewItem.bookInfo)
-
-    setBookInfo({
-      ...reviewItem.bookInfo,
-      status: "DNF",
-    })
-
-    setDnfInfo({
-      percent: progressPercent ? String(progressPercent) : "",
-      reason: "",
-      wouldReadAuthorAgain: "Maybe",
-    })
-
-    setScores({
-      plot: 0,
-      vibe: 0,
-      characters: 0,
-      writingStyle: 0,
-      enjoyability: 0,
-    })
-
-    setMetrics({
-      spice: 0,
-      chemistry: 0,
-      tension: 0,
-      emotionalDamage: 0,
-      bookHangover: 0,
-      contentIntensity: 0,
-    })
-
-    setReview({
-      oneSentenceReview: "",
-      favoriteThing: "",
-      biggestComplaint: "",
-      vibeCheck: "",
-    })
-
-    setTropes([])
-    setObsessionScore(5)
-    setRecommendationLevel("Recommend")
-    setIsFavorite(false)
-    setEditingReviewId(reviewItem.id)
-    setSelectedReview(null)
-    setSaveMessage("")
-    setStep("dnf")
-  }
+  useEffect(() => {
+    loadUser()
+  }, [])
 
   return (
     <main>
       {step === "home" && (
         <section>
+          <Auth
+            user={user}
+            onAuthChange={loadUser}
+          />
+
           <p>Brain Chemistry Books</p>
           <h1>Reading scrapbook meets data analysis.</h1>
           <p>
@@ -681,14 +603,6 @@ ${percent}%`
 
                 <ProgressBar percent={progressPercent} />
 
-                {progressPercent >= 100 && (
-                  <button onClick={() => startReviewFromReading(item)}>
-                    🎉 Finish Book
-                  </button>
-                )}
-
-                <button onClick={() => dnfFromReading(item)}>🚫 DNF Book</button>
-
                 <TextInput
                   label="Update Current Page"
                   value={item.bookInfo.currentPage || ""}
@@ -711,12 +625,9 @@ ${percent}%`
           <p>Your Library</p>
           <h1>Saved Reviews</h1>
 
-          <button onClick={() => setLibraryFilter("all")}>📚 All Books</button>
-          <button onClick={() => setLibraryFilter("reading")}>📖 Currently Reading</button>
-          <button onClick={() => setLibraryFilter("finished")}>✅ Finished</button>
-          <button onClick={() => setLibraryFilter("dnf")}>🚫 DNF</button>
+          <button onClick={() => setLibraryFilter("all")}>All Books</button>
           <button onClick={() => setLibraryFilter("favorites")}>
-            🧠 Brain Chemistry
+            Brain Chemistry Books
           </button>
 
           {filteredReviews.length === 0 && (
@@ -840,14 +751,6 @@ ${percent}%`
                   Page {selectedReview.bookInfo.currentPage || "0"} of {selectedReview.bookInfo.totalPages || "?"}
                 </p>
                 <ProgressBar percent={getProgressPercent(selectedReview.bookInfo)} />
-
-                {getProgressPercent(selectedReview.bookInfo) >= 100 && (
-                  <button onClick={() => startReviewFromReading(selectedReview)}>
-                    🎉 Finish Book
-                  </button>
-                )}
-
-                <button onClick={() => dnfFromReading(selectedReview)}>🚫 DNF Book</button>
               </div>
 
               <div className="score-card">
@@ -1226,7 +1129,7 @@ ${percent}%`
           <input
             type="range"
             min="1"
-            max="5"
+            max="15"
             step="1"
             value={obsessionScore}
             onChange={(e) => setObsessionScore(Number(e.target.value))}
