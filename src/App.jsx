@@ -27,6 +27,12 @@ function App() {
   const [selectedReadingLogBookId, setSelectedReadingLogBookId] = useState(null)
   const [editingReviewId, setEditingReviewId] = useState(null)
   const [libraryFilter, setLibraryFilter] = useState("all")
+  const [librarySearch, setLibrarySearch] = useState("")
+  const [libraryRatingFilter, setLibraryRatingFilter] = useState("all")
+  const [librarySpiceFilter, setLibrarySpiceFilter] = useState("all")
+  const [libraryFinishedYearFilter, setLibraryFinishedYearFilter] = useState("all")
+  const [libraryFinishedMonthFilter, setLibraryFinishedMonthFilter] = useState("all")
+  const [libraryTropeFilter, setLibraryTropeFilter] = useState("all")
 
   const [savedReviews, setSavedReviews] = useState(() => {
     const saved = localStorage.getItem("brainChemistryBooksReviews")
@@ -124,13 +130,71 @@ function App() {
     tropes: true,
   })
 
+  const libraryFinishedYears = Array.from(
+    new Set(
+      savedReviews
+        .filter((item) => item.bookInfo.status === "Finished" && item.bookInfo.dateFinished)
+        .map((item) => new Date(item.bookInfo.dateFinished).getFullYear())
+        .filter((year) => !Number.isNaN(year))
+    )
+  ).sort((a, b) => b - a)
+
+  const libraryTropeOptions = Array.from(
+    new Set(savedReviews.flatMap((item) => item.tropes || []))
+  ).sort()
+
   const filteredReviews = savedReviews.filter((item) => {
-    if (libraryFilter === "favorites") return item.isFavorite
-    if (libraryFilter === "reading") return item.bookInfo.status === "Reading"
-    if (libraryFilter === "finished") return item.bookInfo.status === "Finished"
-    if (libraryFilter === "dnf") return item.bookInfo.status === "DNF"
+    const status = item.bookInfo.status
+
+    if (libraryFilter === "favorites" && !item.isFavorite) return false
+    if (libraryFilter === "reading" && status !== "Reading") return false
+    if (libraryFilter === "finished" && status !== "Finished") return false
+    if (libraryFilter === "dnf" && status !== "DNF") return false
+
+    const searchTerm = librarySearch.trim().toLowerCase()
+    if (searchTerm) {
+      const searchableText = `${item.bookInfo.title || ""} ${item.bookInfo.author || ""}`.toLowerCase()
+      if (!searchableText.includes(searchTerm)) return false
+    }
+
+    if (libraryRatingFilter !== "all") {
+      const minimumRating = Number(libraryRatingFilter)
+      if (Number(item.bookScore || 0) < minimumRating) return false
+    }
+
+    if (librarySpiceFilter !== "all") {
+      const minimumSpice = Number(librarySpiceFilter)
+      if (Number(item.metrics?.spice || 0) < minimumSpice) return false
+    }
+
+    if (libraryFinishedYearFilter !== "all") {
+      if (!item.bookInfo.dateFinished) return false
+      const finishedYear = new Date(item.bookInfo.dateFinished).getFullYear()
+      if (String(finishedYear) !== libraryFinishedYearFilter) return false
+    }
+
+    if (libraryFinishedMonthFilter !== "all") {
+      if (!item.bookInfo.dateFinished) return false
+      const finishedMonth = new Date(item.bookInfo.dateFinished).getMonth() + 1
+      if (String(finishedMonth) !== libraryFinishedMonthFilter) return false
+    }
+
+    if (libraryTropeFilter !== "all") {
+      if (!(item.tropes || []).includes(libraryTropeFilter)) return false
+    }
+
     return true
   })
+
+  function resetLibraryFilters() {
+    setLibraryFilter("all")
+    setLibrarySearch("")
+    setLibraryRatingFilter("all")
+    setLibrarySpiceFilter("all")
+    setLibraryFinishedYearFilter("all")
+    setLibraryFinishedMonthFilter("all")
+    setLibraryTropeFilter("all")
+  }
 
   const totalBooks = savedReviews.length
   const finishedReviews = savedReviews.filter(
@@ -3304,16 +3368,128 @@ ${percent}%`
           <p>Your Library</p>
           <h1>Saved Reviews</h1>
 
-          <button onClick={() => setLibraryFilter("all")}>📚 All Books</button>
-          <button onClick={() => setLibraryFilter("reading")}>📖 Currently Reading</button>
-          <button onClick={() => setLibraryFilter("finished")}>✅ Finished</button>
-          <button onClick={() => setLibraryFilter("dnf")}>🚫 DNF</button>
-          <button onClick={() => setLibraryFilter("favorites")}>
-            🧠 Brain Chemistry
-          </button>
+          <div className="score-card compact-filter-card">
+            <div className="filter-card-header">
+              <div>
+                <p>Smart Library Filters</p>
+                <h3>Find your next shelf visit</h3>
+              </div>
+              <p className="filter-count">Showing {filteredReviews.length} of {savedReviews.length}</p>
+            </div>
+
+            <label className="filter-search-row">
+              Search Title or Author
+              <input
+                type="text"
+                value={librarySearch}
+                onChange={(event) => setLibrarySearch(event.target.value)}
+                placeholder="Search your shelves..."
+              />
+            </label>
+
+            <div className="filter-grid">
+              <label>
+                Status
+                <select
+                  value={libraryFilter}
+                  onChange={(event) => setLibraryFilter(event.target.value)}
+                >
+                  <option value="all">All Books</option>
+                  <option value="reading">Currently Reading</option>
+                  <option value="finished">Finished</option>
+                  <option value="dnf">DNF</option>
+                  <option value="favorites">Brain Chemistry</option>
+                </select>
+              </label>
+
+              <label>
+                Rating
+                <select
+                  value={libraryRatingFilter}
+                  onChange={(event) => setLibraryRatingFilter(event.target.value)}
+                >
+                  <option value="all">All Ratings</option>
+                  <option value="5">5 Stars</option>
+                  <option value="4">4+ Stars</option>
+                  <option value="3">3+ Stars</option>
+                  <option value="2">2+ Stars</option>
+                  <option value="1">1+ Stars</option>
+                </select>
+              </label>
+
+              <label>
+                Spice
+                <select
+                  value={librarySpiceFilter}
+                  onChange={(event) => setLibrarySpiceFilter(event.target.value)}
+                >
+                  <option value="all">All Spice</option>
+                  <option value="5">🌶️ 5</option>
+                  <option value="4">🌶️ 4+</option>
+                  <option value="3">🌶️ 3+</option>
+                  <option value="2">🌶️ 2+</option>
+                  <option value="1">🌶️ 1+</option>
+                </select>
+              </label>
+
+              <label>
+                Finished Year
+                <select
+                  value={libraryFinishedYearFilter}
+                  onChange={(event) => setLibraryFinishedYearFilter(event.target.value)}
+                >
+                  <option value="all">All Years</option>
+                  {libraryFinishedYears.map((year) => (
+                    <option key={year} value={year}>
+                      {year}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label>
+                Finished Month
+                <select
+                  value={libraryFinishedMonthFilter}
+                  onChange={(event) => setLibraryFinishedMonthFilter(event.target.value)}
+                >
+                  <option value="all">All Months</option>
+                  <option value="1">January</option>
+                  <option value="2">February</option>
+                  <option value="3">March</option>
+                  <option value="4">April</option>
+                  <option value="5">May</option>
+                  <option value="6">June</option>
+                  <option value="7">July</option>
+                  <option value="8">August</option>
+                  <option value="9">September</option>
+                  <option value="10">October</option>
+                  <option value="11">November</option>
+                  <option value="12">December</option>
+                </select>
+              </label>
+
+              <label>
+                Trope
+                <select
+                  value={libraryTropeFilter}
+                  onChange={(event) => setLibraryTropeFilter(event.target.value)}
+                >
+                  <option value="all">All Tropes</option>
+                  {libraryTropeOptions.map((trope) => (
+                    <option key={trope} value={trope}>
+                      {trope}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+
+            <button className="filter-reset-button" onClick={resetLibraryFilters}>Reset Filters</button>
+          </div>
 
           {filteredReviews.length === 0 && (
-            <p>No reviews found for this filter.</p>
+            <p>No reviews found for these filters.</p>
           )}
 
           {filteredReviews.map((item) => (
