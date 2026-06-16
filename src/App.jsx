@@ -20,6 +20,39 @@ const tropeOptions = [
   "Why Choose",
 ]
 
+const readingAestheticOptions = [
+  "🌸 Scrapbook Reader",
+  "🌙 Dark Academia",
+  "🍂 Cozy Autumn",
+  "🌲 Forest Library",
+  "🕯️ Midnight Reader",
+  "🌾 Small Town Dreamer",
+  "📖 Bookstore Wanderer",
+  "✨ Soft Romance Era",
+]
+
+const readerTypeOptions = [
+  "📚 TBR Collector",
+  "💕 Mood Reader",
+  "🔁 Series Binger",
+  "🎧 Audiobook Lover",
+  "✨ KU Addict",
+  "📝 Review Writer",
+  "🌙 Night Reader",
+  "☕ Cozy Chapter Chaser",
+]
+
+const favoriteSubgenreOptions = [
+  "🌾 Small Town Romance",
+  "🏒 Sports Romance",
+  "🖤 Dark Romance",
+  "🐺 Paranormal Romance",
+  "🗡️ Fantasy Romance",
+  "🕵️ Romantic Suspense",
+  "🤠 Cowboy Romance",
+  "💐 Contemporary Romance",
+]
+
 function App() {
   const [step, setStep] = useState("home")
   const [user, setUser] = useState(null)
@@ -110,6 +143,27 @@ function App() {
     return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}`
   })
   const [analyticsTab, setAnalyticsTab] = useState("overview")
+  const [profile, setProfile] = useState(() => {
+    const savedProfile = localStorage.getItem("pressedPagesProfile")
+
+    return savedProfile
+      ? JSON.parse(savedProfile)
+      : {
+          displayName: "",
+          username: "",
+          bio: "",
+          favoriteGenre: "",
+          favoriteTrope: "",
+          favoriteVibe: "",
+          avatarUrl: "",
+          readingAesthetic: "",
+          readerType: "",
+          favoriteSubgenre: "",
+          isPublicProfile: false,
+        }
+  })
+  const [profileSavedMessage, setProfileSavedMessage] = useState("")
+
 
   const [readingGoals, setReadingGoals] = useState(() => {
     const savedGoals = localStorage.getItem("brainChemistryBooksReadingGoals")
@@ -1674,6 +1728,186 @@ ${review.vibeCheck}`
   }
 
 
+  function buildMonthlyWrapUpGraphicSvg(stats = monthlyWrapUpStats) {
+    const safeStats = stats || {}
+    const width = 1080
+    const height = 1080
+    const monthLabel = safeStats.monthLabel || "Monthly Wrap-Up"
+    const favoriteRead =
+      safeStats.highestRated?.bookInfo?.title ||
+      safeStats.favoriteReads?.[0]?.bookInfo?.title ||
+      "Add a favorite read"
+    const favoriteAuthor =
+      safeStats.highestRated?.bookInfo?.author ||
+      safeStats.favoriteReads?.[0]?.bookInfo?.author ||
+      ""
+    const topTrope = safeStats.topTrope?.[0] || "No trope yet"
+    const topAuthor = safeStats.topAuthor?.[0] || "No author yet"
+    const fastestRead = safeStats.fastestRead?.item?.bookInfo?.title || "No fastest read yet"
+    const fastestDays = safeStats.fastestRead?.days
+    const slowestRead = safeStats.slowestRead?.item?.bookInfo?.title || "No slowest read yet"
+    const slowestDays = safeStats.slowestRead?.days
+    const favoriteLines = getWrappedSvgLines(favoriteRead, 24, 2)
+    const bookLines =
+      (safeStats.books || []).slice(0, 5).map((item, index) => {
+        const title = getWrappedSvgLines(item.bookInfo?.title || "Untitled Book", 30, 1)[0]
+        const rating = item.bookScore ? `${item.bookScore}/5` : "unrated"
+        return `<text x="150" y="${806 + index * 39}" font-size="27" fill="#4F3B33">${index + 1}. ${escapeSvgText(title)} • ${escapeSvgText(rating)}</text>`
+      }).join("") ||
+      `<text x="150" y="806" font-size="27" fill="#4F3B33">No finished books yet</text>`
+
+    return `
+      <svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
+        <defs>
+          <linearGradient id="paper" x1="0" x2="1" y1="0" y2="1">
+            <stop offset="0%" stop-color="#FFFDFC"/>
+            <stop offset="55%" stop-color="#F7F1E8"/>
+            <stop offset="100%" stop-color="#EFE3D4"/>
+          </linearGradient>
+          <linearGradient id="rose" x1="0" x2="1" y1="0" y2="1">
+            <stop offset="0%" stop-color="#E9CBC3"/>
+            <stop offset="100%" stop-color="#B89AA6"/>
+          </linearGradient>
+          <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+            <feDropShadow dx="0" dy="18" stdDeviation="18" flood-color="#4F3B33" flood-opacity="0.18"/>
+          </filter>
+          <pattern id="grid" width="42" height="42" patternUnits="userSpaceOnUse">
+            <path d="M 42 0 L 0 0 0 42" fill="none" stroke="#7A5D50" stroke-opacity="0.08" stroke-width="2"/>
+          </pattern>
+        </defs>
+
+        <rect width="1080" height="1080" fill="#F7F1E8"/>
+        <rect width="1080" height="1080" fill="url(#grid)" opacity="0.7"/>
+        <circle cx="135" cy="120" r="165" fill="#D9B8B0" opacity="0.28"/>
+        <circle cx="930" cy="150" r="138" fill="#A8B29A" opacity="0.30"/>
+        <circle cx="930" cy="942" r="170" fill="#C8A96A" opacity="0.16"/>
+
+        <rect x="82" y="74" width="916" height="932" rx="46" fill="url(#paper)" stroke="#7A5D50" stroke-opacity="0.28" stroke-width="3" filter="url(#shadow)"/>
+        <rect x="420" y="50" width="240" height="52" rx="10" fill="#D9B8B0" opacity="0.72" transform="rotate(-2 540 76)" stroke="#7A5D50" stroke-opacity="0.18"/>
+
+        <text x="540" y="155" text-anchor="middle" font-family="Georgia, serif" font-size="31" letter-spacing="5" fill="#7A5D50">PRESSED PAGES</text>
+        <text x="540" y="222" text-anchor="middle" font-family="Georgia, serif" font-size="64" font-weight="700" fill="#4F3B33">${escapeSvgText(monthLabel)}</text>
+        <text x="540" y="270" text-anchor="middle" font-family="Georgia, serif" font-size="31" fill="#7A5D50">Monthly Wrap-Up</text>
+
+        <rect x="130" y="322" width="820" height="156" rx="30" fill="#FFFDFC" stroke="#7A5D50" stroke-opacity="0.22"/>
+        <text x="178" y="382" font-family="Georgia, serif" font-size="30" fill="#7A5D50">FAVORITE READ</text>
+        ${favoriteLines.map((line, index) => `<text x="178" y="${426 + index * 42}" font-family="Georgia, serif" font-size="38" font-weight="700" fill="#4F3B33">${escapeSvgText(line)}</text>`).join("")}
+        ${favoriteAuthor ? `<text x="178" y="468" font-family="Georgia, serif" font-size="26" fill="#7A5D50">by ${escapeSvgText(favoriteAuthor)}</text>` : ""}
+
+        <rect x="130" y="520" width="250" height="130" rx="28" fill="#EFE3D4" stroke="#7A5D50" stroke-opacity="0.18"/>
+        <text x="255" y="568" text-anchor="middle" font-family="Georgia, serif" font-size="24" fill="#7A5D50">BOOKS</text>
+        <text x="255" y="620" text-anchor="middle" font-family="Georgia, serif" font-size="54" font-weight="700" fill="#4F3B33">${safeStats.booksFinished || 0}</text>
+
+        <rect x="415" y="520" width="250" height="130" rx="28" fill="#EFE3D4" stroke="#7A5D50" stroke-opacity="0.18"/>
+        <text x="540" y="568" text-anchor="middle" font-family="Georgia, serif" font-size="24" fill="#7A5D50">AVG RATING</text>
+        <text x="540" y="620" text-anchor="middle" font-family="Georgia, serif" font-size="54" font-weight="700" fill="#4F3B33">${safeStats.averageRating || 0}</text>
+
+        <rect x="700" y="520" width="250" height="130" rx="28" fill="#EFE3D4" stroke="#7A5D50" stroke-opacity="0.18"/>
+        <text x="825" y="568" text-anchor="middle" font-family="Georgia, serif" font-size="24" fill="#7A5D50">AVG SPICE</text>
+        <text x="825" y="620" text-anchor="middle" font-family="Georgia, serif" font-size="54" font-weight="700" fill="#4F3B33">${safeStats.averageSpice || 0}</text>
+
+        <rect x="130" y="690" width="820" height="265" rx="32" fill="#FFFDFC" stroke="#7A5D50" stroke-opacity="0.22"/>
+        <text x="170" y="748" font-family="Georgia, serif" font-size="28" fill="#7A5D50">FINISHED SHELF</text>
+        ${bookLines}
+        <text x="590" y="806" font-family="Georgia, serif" font-size="24" fill="#4F3B33">Favorite trope: ${escapeSvgText(topTrope)}</text>
+        <text x="590" y="846" font-family="Georgia, serif" font-size="24" fill="#4F3B33">Most read author: ${escapeSvgText(topAuthor)}</text>
+        <text x="590" y="886" font-family="Georgia, serif" font-size="24" fill="#4F3B33">Fastest: ${escapeSvgText(fastestRead)}${fastestDays ? ` (${fastestDays}d)` : ""}</text>
+        <text x="590" y="926" font-family="Georgia, serif" font-size="24" fill="#4F3B33">Slowest: ${escapeSvgText(slowestRead)}${slowestDays ? ` (${slowestDays}d)` : ""}</text>
+
+        <path d="M795 276 C845 224 913 247 902 320 C894 374 838 408 792 442 C752 405 707 362 716 313 C725 264 767 257 795 276Z" fill="url(#rose)" opacity="0.42"/>
+        <path d="M804 288 C823 320 830 356 827 405" fill="none" stroke="#7A5D50" stroke-opacity="0.32" stroke-width="5" stroke-linecap="round"/>
+        <path d="M268 214 C241 186 201 199 204 241 C207 279 242 298 270 320 C298 296 328 269 324 235 C320 201 288 199 268 214Z" fill="#A8B29A" opacity="0.38"/>
+
+        <text x="540" y="1000" text-anchor="middle" font-family="Georgia, serif" font-size="25" letter-spacing="3" fill="#7A5D50">READ • RATE • ROMANTICIZE ♡</text>
+      </svg>`
+  }
+
+  function getMonthlyWrapUpGraphicDataUrl(stats = monthlyWrapUpStats) {
+    return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(buildMonthlyWrapUpGraphicSvg(stats))}`
+  }
+
+  function downloadMonthlyWrapUpGraphicSvg(stats = monthlyWrapUpStats) {
+    const safeStats = stats || {}
+    const svg = buildMonthlyWrapUpGraphicSvg(safeStats)
+    const blob = new Blob([svg], { type: "image/svg+xml;charset=utf-8" })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement("a")
+    link.href = url
+    link.download = `${getSafeFileName(safeStats.monthLabel || "monthly-wrap-up")}-wrap-up.svg`
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    URL.revokeObjectURL(url)
+  }
+
+  function downloadMonthlyWrapUpGraphicPng(stats = monthlyWrapUpStats) {
+    const safeStats = stats || {}
+    const svg = buildMonthlyWrapUpGraphicSvg(safeStats)
+    const svgBlob = new Blob([svg], { type: "image/svg+xml;charset=utf-8" })
+    const svgUrl = URL.createObjectURL(svgBlob)
+    const image = new Image()
+
+    image.onload = () => {
+      const canvas = document.createElement("canvas")
+      canvas.width = 1080
+      canvas.height = 1080
+      const context = canvas.getContext("2d")
+
+      if (!context) {
+        URL.revokeObjectURL(svgUrl)
+        downloadMonthlyWrapUpGraphicSvg(safeStats)
+        setSaveMessage("PNG download had trouble, so I downloaded an SVG backup instead.")
+        return
+      }
+
+      context.fillStyle = "#F7F1E8"
+      context.fillRect(0, 0, canvas.width, canvas.height)
+      context.drawImage(image, 0, 0)
+
+      const link = document.createElement("a")
+      link.download = `${getSafeFileName(safeStats.monthLabel || "monthly-wrap-up")}-wrap-up.png`
+      link.href = canvas.toDataURL("image/png")
+      link.click()
+      URL.revokeObjectURL(svgUrl)
+      setSaveMessage("Monthly wrap-up graphic downloaded 🌙")
+    }
+
+    image.onerror = () => {
+      URL.revokeObjectURL(svgUrl)
+      setSaveMessage("PNG download had trouble, so I downloaded an SVG backup instead.")
+      downloadMonthlyWrapUpGraphicSvg(safeStats)
+    }
+
+    image.src = svgUrl
+  }
+
+
+
+  function updateProfile(field, value) {
+    setProfile({
+      ...profile,
+      [field]: value,
+    })
+  }
+
+  function saveProfile() {
+    localStorage.setItem("pressedPagesProfile", JSON.stringify(profile))
+    setProfileSavedMessage("Profile saved ✨")
+  }
+
+  function copyPublicProfileLink() {
+    const profilePath = `/u/${cleanProfileUsername}`
+    const profileUrl = `${window.location.origin}${profilePath}`
+
+    navigator.clipboard
+      .writeText(profileUrl)
+      .then(() => {
+        setProfileSavedMessage("Public profile link copied 🌸")
+      })
+      .catch(() => {
+        setProfileSavedMessage(`Copy this profile link: ${profileUrl}`)
+      })
+  }
 
   function getAchievementStats() {
     const totalPagesLogged = readingAnalyticsStats.totalPages || 0
@@ -1967,6 +2201,28 @@ ${review.vibeCheck}`
   const readingCalendarStats = getReadingCalendarStats(calendarMonthKey)
   const readingGoalStats = getReadingGoalStats()
   const achievementStats = getAchievementStats()
+
+  const profileDisplayName =
+    profile.displayName || user?.email?.split("@")[0] || "Pressed Pages Reader"
+  const cleanProfileUsername =
+    (profile.username || "reader").replace(/^@+/, "").trim() || "reader"
+  const recentFinishedReads = [...finishedReviews]
+    .filter((item) => item.bookInfo.dateFinished)
+    .sort(
+      (a, b) =>
+        new Date(b.bookInfo.dateFinished).getTime() -
+        new Date(a.bookInfo.dateFinished).getTime()
+    )
+    .slice(0, 4)
+  const profileFavoriteTrope = profile.favoriteTrope || mostReadTrope?.[0] || "Not chosen yet"
+  const profileFavoriteGenre = profile.favoriteGenre || "Not chosen yet"
+  const profileFavoriteVibe = profile.favoriteVibe || "Not chosen yet"
+  const profileReadingAesthetic = profile.readingAesthetic || "🌸 Scrapbook Reader"
+  const profileReaderType = profile.readerType || "📚 TBR Collector"
+  const profileFavoriteSubgenre = profile.favoriteSubgenre || profile.favoriteGenre || "🌾 Romance Reader"
+  const publicProfilePath = `/u/${cleanProfileUsername}`
+  const publicProfileUrl =
+    typeof window !== "undefined" ? `${window.location.origin}${publicProfilePath}` : publicProfilePath
 
   const currentYear = new Date().getFullYear()
 
@@ -2809,6 +3065,139 @@ ${percent}%`
     }
   }
 
+  function getReadingHeatMapStats(daysBack = 90) {
+    const logs = getAllReadingLogs()
+    const logsByDate = {}
+
+    logs.forEach((log) => {
+      if (!log.date) return
+
+      if (!logsByDate[log.date]) {
+        logsByDate[log.date] = {
+          sessions: 0,
+          pages: 0,
+          minutes: 0,
+        }
+      }
+
+      logsByDate[log.date].sessions += 1
+      logsByDate[log.date].pages += Number(log.pagesRead || 0)
+      logsByDate[log.date].minutes += Number(log.minutesRead || 0)
+    })
+
+    const today = new Date()
+    today.setHours(12, 0, 0, 0)
+
+    const startDate = new Date(today)
+    startDate.setDate(startDate.getDate() - (daysBack - 1))
+
+    const leadingBlanks = startDate.getDay()
+    const days = []
+
+    for (let index = 0; index < leadingBlanks; index += 1) {
+      days.push(null)
+    }
+
+    let readingDayCount = 0
+    let totalSessions = 0
+    let totalPages = 0
+    let totalMinutes = 0
+
+    for (let index = 0; index < daysBack; index += 1) {
+      const currentDate = new Date(startDate)
+      currentDate.setDate(startDate.getDate() + index)
+
+      const dateKey = getLocalDateKey(currentDate)
+      const dateData = logsByDate[dateKey] || {
+        sessions: 0,
+        pages: 0,
+        minutes: 0,
+      }
+
+      if (dateData.sessions > 0) {
+        readingDayCount += 1
+      }
+
+      totalSessions += dateData.sessions
+      totalPages += dateData.pages
+      totalMinutes += dateData.minutes
+
+      days.push({
+        date: dateKey,
+        sessions: dateData.sessions,
+        pages: dateData.pages,
+        minutes: dateData.minutes,
+      })
+    }
+
+    return {
+      days,
+      daysBack,
+      readingDayCount,
+      totalSessions,
+      totalPages,
+      totalMinutes,
+      consistencyPercent: daysBack
+        ? Math.round((readingDayCount / daysBack) * 100)
+        : 0,
+    }
+  }
+
+  function ReadingHeatMap({ daysBack = 90, compact = false }) {
+    const heatMapStats = getReadingHeatMapStats(daysBack)
+
+    return (
+      <div className={`reading-heatmap ${compact ? "reading-heatmap-compact" : ""}`}>
+        <div className="reading-heatmap-summary">
+          <div>
+            <strong>{heatMapStats.readingDayCount}</strong>
+            <span> reading days</span>
+          </div>
+          <div>
+            <strong>{heatMapStats.consistencyPercent}%</strong>
+            <span> consistency</span>
+          </div>
+          {!compact && (
+            <>
+              <div>
+                <strong>{heatMapStats.totalSessions}</strong>
+                <span> logs</span>
+              </div>
+              <div>
+                <strong>{heatMapStats.totalPages}</strong>
+                <span> pages</span>
+              </div>
+            </>
+          )}
+        </div>
+
+        <div className="reading-heatmap-scroll">
+          <div className="reading-heatmap-grid">
+            {heatMapStats.days.map((day, index) =>
+              day ? (
+                <div
+                  key={day.date}
+                  className={`reading-heatmap-day ${day.sessions > 0 ? "is-reading-day" : ""}`}
+                  title={`${formatDateKey(day.date)} • ${day.sessions} log${day.sessions === 1 ? "" : "s"} • ${day.pages} pages`}
+                  aria-label={`${formatDateKey(day.date)}: ${day.sessions} reading log${day.sessions === 1 ? "" : "s"}`}
+                />
+              ) : (
+                <div key={`blank-${index}`} className="reading-heatmap-day is-blank" />
+              )
+            )}
+          </div>
+        </div>
+
+        <div className="reading-heatmap-legend">
+          <span>Less</span>
+          <span className="reading-heatmap-day" />
+          <span className="reading-heatmap-day is-reading-day" />
+          <span>More</span>
+        </div>
+      </div>
+    )
+  }
+
   useEffect(() => {
     loadUser()
 
@@ -2877,6 +3266,7 @@ ${percent}%`
           <button onClick={() => setStep("currentlyReading")}>Currently Reading</button>
           <button onClick={() => setStep("library")}>View Library</button>
           <button onClick={() => setStep("analytics")}>Reading Analytics</button>
+          <button onClick={() => setStep("profile")}>Reader Profile</button>
 
           {savedReviews.length > 0 && (
             <div className="score-card">
@@ -2902,6 +3292,426 @@ ${percent}%`
               ))}
             </div>
           )}
+        </section>
+      )}
+
+
+      {step === "profile" && (
+        <section>
+          <p>Pressed Pages Profile</p>
+          <h1>Your reader scrapbook.</h1>
+          <p>{profile.isPublicProfile ? "Public profile is enabled — your reader scrapbook is ready to share." : "Private by default — turn on public sharing when you want a profile link."}</p>
+
+          {profileSavedMessage && <p>{profileSavedMessage}</p>}
+
+          <div className="profile-card">
+            <div className="profile-header">
+              <div className="profile-avatar">
+                {profile.avatarUrl ? (
+                  <img src={profile.avatarUrl} alt={`${profileDisplayName} avatar`} />
+                ) : (
+                  <span>📚</span>
+                )}
+              </div>
+
+              <div>
+                <p>Read • Rate • Romanticize</p>
+                <h2>{profileDisplayName}</h2>
+                <p>@{cleanProfileUsername}</p>
+                <p>{profile.bio || "Add a little reader bio to make this page feel like yours."}</p>
+              </div>
+            </div>
+
+            <div className="profile-banner">
+              <p>Reader Flair</p>
+              <div className="profile-flair-row">
+                <span>{profileReadingAesthetic}</span>
+                <span>{profileReaderType}</span>
+                <span>{profileFavoriteSubgenre}</span>
+              </div>
+            </div>
+
+            <div className="profile-favorites-grid">
+              <div>
+                <strong>Favorite Genre</strong>
+                <p>{profileFavoriteGenre}</p>
+              </div>
+              <div>
+                <strong>Favorite Trope</strong>
+                <p>{profileFavoriteTrope}</p>
+              </div>
+              <div>
+                <strong>Favorite Reading Vibe</strong>
+                <p>{profileFavoriteVibe}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="profile-public-card">
+            <p>Public Profile</p>
+            <h3>{profile.isPublicProfile ? "🌎 Public profile enabled" : "🔒 Profile is private"}</h3>
+            <p>
+              {profile.isPublicProfile
+                ? "Share a reader-safe version of this page with your profile link."
+                : "Your profile stays private until you turn public sharing on in Edit Profile."}
+            </p>
+
+            {profile.isPublicProfile && (
+              <>
+                <input readOnly value={publicProfileUrl} aria-label="Public profile link" />
+                <button type="button" onClick={copyPublicProfileLink}>Copy Profile Link</button>
+                <button type="button" onClick={() => setStep("publicProfilePreview")}>Preview Public Profile</button>
+              </>
+            )}
+          </div>
+
+          <button onClick={() => setStep("editProfile")}>Edit Profile</button>
+
+          <div className="profile-stats-grid">
+            <div className="score-card">
+              <p>📚 Books This Year</p>
+              <h2>{yearToDateCount}</h2>
+            </div>
+            <div className="score-card">
+              <p>🔥 Current Streak</p>
+              <h2>{readingStreakStats.currentStreak}</h2>
+              <p>day{readingStreakStats.currentStreak === 1 ? "" : "s"}</p>
+            </div>
+            <div className="score-card">
+              <p>🏆 Longest Streak</p>
+              <h2>{readingStreakStats.longestStreak}</h2>
+              <p>day{readingStreakStats.longestStreak === 1 ? "" : "s"}</p>
+            </div>
+            <div className="score-card">
+              <p>⭐ Average Rating</p>
+              <h2>{averageRating}</h2>
+              <p>out of 5</p>
+            </div>
+            <div className="score-card">
+              <p>🌶️ Average Spice</p>
+              <h2>{averageSpice}</h2>
+              <p>out of 5</p>
+            </div>
+            <div className="score-card">
+              <p>📖 Reading Days</p>
+              <h2>{readingAnalyticsStats.readingDaysThisYear}</h2>
+              <p>this year</p>
+            </div>
+          </div>
+
+          <div className="score-card">
+            <p>🌸 Pressed Petals</p>
+            <p>A bloom for every day you spent reading.</p>
+            <ReadingHeatMap daysBack={90} compact />
+          </div>
+
+          <div className="score-card">
+            <p>Recently Finished Shelf</p>
+
+            {recentFinishedReads.length ? (
+              <div className="profile-recent-grid">
+                {recentFinishedReads.map((item) => (
+                  <div key={item.id} className="profile-recent-book">
+                    {item.bookInfo.coverUrl && (
+                      <img src={item.bookInfo.coverUrl} alt={`${item.bookInfo.title} cover`} />
+                    )}
+                    <strong>{item.bookInfo.title || "Untitled Book"}</strong>
+                    <p>{item.bookInfo.author || "Unknown Author"}</p>
+                    <p>⭐ {item.bookScore}/5 • 🌶️ {item.metrics?.spice || 0}/5</p>
+                    {item.bookInfo.dateFinished && (
+                      <p>Finished {formatDate(item.bookInfo.dateFinished)}</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p>No finished books yet. Finish a book to start building your shelf.</p>
+            )}
+          </div>
+
+          <div className="score-card">
+            <p>Achievement Showcase</p>
+            <p>Unlocked Achievements: {achievementStats.unlocked} / {achievementStats.total}</p>
+            {achievementStats.nextAchievement ? (
+              <p>Next Up: {achievementStats.nextAchievement.icon} {achievementStats.nextAchievement.name}</p>
+            ) : (
+              <p>Every achievement is unlocked. Icon behavior.</p>
+            )}
+          </div>
+
+          <button onClick={() => setStep("home")}>Back Home</button>
+        </section>
+      )}
+
+
+      {step === "publicProfilePreview" && (
+        <section>
+          <p>Public Profile Preview</p>
+          <h1>@{cleanProfileUsername}</h1>
+          <p>This is the shareable version of your reader scrapbook.</p>
+
+          {profile.isPublicProfile ? (
+            <>
+              <div className="profile-card public-profile-card">
+                <div className="profile-header">
+                  <div className="profile-avatar">
+                    {profile.avatarUrl ? (
+                      <img src={profile.avatarUrl} alt={`${profileDisplayName} avatar`} />
+                    ) : (
+                      <span>📚</span>
+                    )}
+                  </div>
+
+                  <div>
+                    <p>Read • Rate • Romanticize</p>
+                    <h2>{profileDisplayName}</h2>
+                    <p>@{cleanProfileUsername}</p>
+                    <p>{profile.bio || "A Pressed Pages reader romanticizing their reading life."}</p>
+                  </div>
+                </div>
+
+                <div className="profile-banner">
+                  <p>Reader Flair</p>
+                  <div className="profile-flair-row">
+                    <span>{profileReadingAesthetic}</span>
+                    <span>{profileReaderType}</span>
+                    <span>{profileFavoriteSubgenre}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="profile-stats-grid">
+                <div className="score-card">
+                  <p>📚 Books This Year</p>
+                  <h2>{yearToDateCount}</h2>
+                </div>
+                <div className="score-card">
+                  <p>🔥 Current Streak</p>
+                  <h2>{readingStreakStats.currentStreak}</h2>
+                  <p>day{readingStreakStats.currentStreak === 1 ? "" : "s"}</p>
+                </div>
+                <div className="score-card">
+                  <p>🏆 Longest Streak</p>
+                  <h2>{readingStreakStats.longestStreak}</h2>
+                  <p>day{readingStreakStats.longestStreak === 1 ? "" : "s"}</p>
+                </div>
+                <div className="score-card">
+                  <p>⭐ Average Rating</p>
+                  <h2>{averageRating}</h2>
+                  <p>out of 5</p>
+                </div>
+              </div>
+
+              <div className="score-card">
+                <p>🌸 Pressed Petals</p>
+                <p>A bloom for every day spent reading.</p>
+                <ReadingHeatMap daysBack={90} compact />
+              </div>
+
+              <div className="score-card">
+                <p>Recently Finished</p>
+
+                {recentFinishedReads.length ? (
+                  <div className="profile-recent-grid">
+                    {recentFinishedReads.map((item) => (
+                      <div key={item.id} className="profile-recent-book">
+                        {item.bookInfo.coverUrl && (
+                          <img src={item.bookInfo.coverUrl} alt={`${item.bookInfo.title} cover`} />
+                        )}
+                        <strong>{item.bookInfo.title || "Untitled Book"}</strong>
+                        <p>{item.bookInfo.author || "Unknown Author"}</p>
+                        <p>⭐ {item.bookScore}/5</p>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p>No recent finished books yet.</p>
+                )}
+              </div>
+
+              <div className="score-card">
+                <p>Achievement Showcase</p>
+                <p>Unlocked Achievements: {achievementStats.unlocked} / {achievementStats.total}</p>
+              </div>
+            </>
+          ) : (
+            <div className="score-card">
+              <p>🔒 This profile is private.</p>
+              <p>Turn on public sharing in Edit Profile to preview the public version.</p>
+            </div>
+          )}
+
+          <button type="button" onClick={() => setStep("profile")}>Back to Profile</button>
+        </section>
+      )}
+
+
+      {step === "editProfile" && (
+        <section>
+          <p>Pressed Pages Profile</p>
+          <h1>Edit your reader scrapbook.</h1>
+          <p>Update your profile details, reader flair, and square avatar image.</p>
+
+          {profileSavedMessage && <p>{profileSavedMessage}</p>}
+
+          <div className="profile-card profile-edit-preview">
+            <div className="profile-header">
+              <div className="profile-avatar">
+                {profile.avatarUrl ? (
+                  <img src={profile.avatarUrl} alt={`${profileDisplayName} avatar preview`} />
+                ) : (
+                  <span>📚</span>
+                )}
+              </div>
+
+              <div>
+                <p>Preview</p>
+                <h2>{profileDisplayName}</h2>
+                <p>@{cleanProfileUsername}</p>
+                <p>{profile.bio || "Add a little reader bio to make this page feel like yours."}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="score-card profile-edit-card">
+            <p>Edit Profile</p>
+
+            <label>
+              Display Name
+              <input
+                type="text"
+                value={profile.displayName}
+                onChange={(event) => updateProfile("displayName", event.target.value)}
+                placeholder="Example: Kenna Jean"
+              />
+            </label>
+
+            <label>
+              Username
+              <input
+                type="text"
+                value={profile.username}
+                onChange={(event) => updateProfile("username", event.target.value)}
+                placeholder="Example: kenna_reads"
+              />
+            </label>
+
+            <label>
+              Bio
+              <textarea
+                value={profile.bio}
+                onChange={(event) => updateProfile("bio", event.target.value)}
+                placeholder="Romance reader. Small-town addict. Professional TBR collector."
+              />
+            </label>
+
+            <label>
+              Reading Aesthetic
+              <select
+                value={profile.readingAesthetic || ""}
+                onChange={(event) => updateProfile("readingAesthetic", event.target.value)}
+              >
+                <option value="">Choose a reading aesthetic</option>
+                {readingAestheticOptions.map((option) => (
+                  <option key={option} value={option}>{option}</option>
+                ))}
+              </select>
+            </label>
+
+            <label>
+              Reader Type
+              <select
+                value={profile.readerType || ""}
+                onChange={(event) => updateProfile("readerType", event.target.value)}
+              >
+                <option value="">Choose a reader type</option>
+                {readerTypeOptions.map((option) => (
+                  <option key={option} value={option}>{option}</option>
+                ))}
+              </select>
+            </label>
+
+            <label>
+              Favorite Subgenre
+              <select
+                value={profile.favoriteSubgenre || ""}
+                onChange={(event) => updateProfile("favoriteSubgenre", event.target.value)}
+              >
+                <option value="">Choose a favorite subgenre</option>
+                {favoriteSubgenreOptions.map((option) => (
+                  <option key={option} value={option}>{option}</option>
+                ))}
+              </select>
+            </label>
+
+            <label>
+              Favorite Genre
+              <input
+                type="text"
+                value={profile.favoriteGenre}
+                onChange={(event) => updateProfile("favoriteGenre", event.target.value)}
+                placeholder="Example: Romance"
+              />
+            </label>
+
+            <label>
+              Favorite Trope
+              <input
+                type="text"
+                value={profile.favoriteTrope}
+                onChange={(event) => updateProfile("favoriteTrope", event.target.value)}
+                placeholder="Example: Small Town"
+              />
+            </label>
+
+            <label>
+              Favorite Reading Vibe
+              <input
+                type="text"
+                value={profile.favoriteVibe}
+                onChange={(event) => updateProfile("favoriteVibe", event.target.value)}
+                placeholder="Example: Cozy rural romance"
+              />
+            </label>
+
+            <label>
+              Avatar Image URL
+              <input
+                type="url"
+                value={profile.avatarUrl}
+                onChange={(event) => updateProfile("avatarUrl", event.target.value)}
+                placeholder="Paste an image link for now"
+              />
+            </label>
+
+            <p className="profile-helper-text">Avatar images are automatically cropped to a 200px by 200px square.</p>
+
+            <label className="profile-public-toggle">
+              <input
+                type="checkbox"
+                checked={Boolean(profile.isPublicProfile)}
+                onChange={(event) => updateProfile("isPublicProfile", event.target.checked)}
+              />
+              <span>Make my profile public and shareable</span>
+            </label>
+
+            {profile.isPublicProfile && (
+              <div className="profile-public-card">
+                <p>Your public profile link</p>
+                <input readOnly value={publicProfileUrl} aria-label="Public profile link preview" />
+              </div>
+            )}
+
+            <button
+              onClick={() => {
+                saveProfile()
+                setStep("profile")
+              }}
+            >
+              Save Profile
+            </button>
+            <button onClick={() => setStep("profile")}>Cancel</button>
+          </div>
         </section>
       )}
 
@@ -3186,6 +3996,22 @@ ${percent}%`
 
             {monthlyWrapUpStats.booksFinished > 0 ? (
               <>
+                <div className="wrapup-graphic-panel">
+                  <img
+                    className="wrapup-graphic-preview"
+                    src={getMonthlyWrapUpGraphicDataUrl(monthlyWrapUpStats)}
+                    alt={`${monthlyWrapUpStats.monthLabel} Pressed Pages wrap-up graphic preview`}
+                  />
+                  <div className="wrapup-graphic-actions">
+                    <button onClick={() => downloadMonthlyWrapUpGraphicPng(monthlyWrapUpStats)}>
+                      🎨 Download Wrap-Up PNG
+                    </button>
+                    <button onClick={() => downloadMonthlyWrapUpGraphicSvg(monthlyWrapUpStats)}>
+                      Save SVG Backup
+                    </button>
+                  </div>
+                </div>
+
                 <p>Books Finished: {monthlyWrapUpStats.booksFinished}</p>
                 <p>Average Rating: {monthlyWrapUpStats.averageRating}/5</p>
                 <p>Average Spice: {monthlyWrapUpStats.averageSpice}/5</p>
@@ -3289,6 +4115,12 @@ ${percent}%`
             {readingStreakStats.lastLoggedDate && (
               <p>Last Reading Day: {formatDateKey(readingStreakStats.lastLoggedDate)}</p>
             )}
+          </div>
+
+          <div className={`score-card ${analyticsTab === "overview" ? "" : "analytics-panel-hidden"}`}>
+            <p>📆 Reading Heat Map</p>
+            <p>A cozy snapshot of your last 180 days of reading logs.</p>
+            <ReadingHeatMap daysBack={180} />
           </div>
 
           <div className={`score-card ${analyticsTab === "overview" ? "" : "analytics-panel-hidden"}`}>
