@@ -90,6 +90,39 @@ function App() {
   const [readingLogs, setReadingLogs] = useState([])
   const [readingLogMinutesInputs, setReadingLogMinutesInputs] = useState({})
   const [readingLogNoteInputs, setReadingLogNoteInputs] = useState({})
+  const [calendarMonthKey, setCalendarMonthKey] = useState(() => {
+    const today = new Date()
+    return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}`
+  })
+  const [selectedCalendarDate, setSelectedCalendarDate] = useState(() => {
+    const today = new Date()
+    return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`
+  })
+
+  const [readingGoals, setReadingGoals] = useState(() => {
+    const savedGoals = localStorage.getItem("brainChemistryBooksReadingGoals")
+
+    return savedGoals
+      ? JSON.parse(savedGoals)
+      : {
+          books: "75",
+          pages: "",
+          readingDays: "",
+          minutes: "",
+        }
+  })
+
+  const [reviewGraphicTemplate, setReviewGraphicTemplate] = useState("scrapbook")
+  const [reviewGraphicSize, setReviewGraphicSize] = useState("square")
+  const [reviewCaptionPlatform, setReviewCaptionPlatform] = useState("instagram")
+  const [reviewGraphicFields, setReviewGraphicFields] = useState({
+    rating: true,
+    spice: true,
+    obsession: true,
+    review: true,
+    vibe: true,
+    tropes: true,
+  })
 
   const filteredReviews = savedReviews.filter((item) => {
     if (libraryFilter === "favorites") return item.isFavorite
@@ -545,6 +578,471 @@ ${review.vibeCheck}`
     )
   }
 
+
+  function updateReadingGoal(field, value) {
+    const cleanValue = value === "" ? "" : Math.max(0, Number(value))
+    setReadingGoals({
+      ...readingGoals,
+      [field]: cleanValue === "" ? "" : String(cleanValue),
+    })
+  }
+
+  function getGoalPercent(currentValue, goalValue) {
+    const goalNumber = Number(goalValue || 0)
+
+    if (!goalNumber) return 0
+
+    return Math.min(100, Math.round((Number(currentValue || 0) / goalNumber) * 100))
+  }
+
+  function getReadingGoalStats() {
+    const logs = getAllReadingLogs()
+    const currentYearKey = String(new Date().getFullYear())
+    const logsThisYear = logs.filter((log) => (log.date || "").startsWith(currentYearKey))
+    const readingDaysThisYear = new Set(
+      logsThisYear.filter((log) => log.date).map((log) => log.date)
+    ).size
+
+    const pagesThisYear = logsThisYear.reduce(
+      (sum, log) => sum + Number(log.pagesRead || 0),
+      0
+    )
+
+    const minutesThisYear = logsThisYear.reduce(
+      (sum, log) => sum + Number(log.minutesRead || 0),
+      0
+    )
+
+    const booksFinishedThisYear = finishedReviews.filter((item) =>
+      (item.bookInfo.dateFinished || "").startsWith(currentYearKey)
+    ).length
+
+    return {
+      currentYearKey,
+      booksFinishedThisYear,
+      pagesThisYear,
+      readingDaysThisYear,
+      minutesThisYear,
+      hoursThisYear: Math.round((minutesThisYear / 60) * 10) / 10,
+      booksPercent: getGoalPercent(booksFinishedThisYear, readingGoals.books),
+      pagesPercent: getGoalPercent(pagesThisYear, readingGoals.pages),
+      readingDaysPercent: getGoalPercent(readingDaysThisYear, readingGoals.readingDays),
+      minutesPercent: getGoalPercent(minutesThisYear, readingGoals.minutes),
+    }
+  }
+
+
+  function escapeSvgText(value) {
+    return String(value || "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;")
+  }
+
+  function getWrappedSvgLines(value, maxCharacters = 34, maxLines = 4) {
+    const words = String(value || "")
+      .replace(/\s+/g, " ")
+      .trim()
+      .split(" ")
+      .filter(Boolean)
+
+    const lines = []
+    let currentLine = ""
+
+    words.forEach((word) => {
+      const nextLine = currentLine ? `${currentLine} ${word}` : word
+
+      if (nextLine.length > maxCharacters && currentLine) {
+        lines.push(currentLine)
+        currentLine = word
+      } else {
+        currentLine = nextLine
+      }
+    })
+
+    if (currentLine) lines.push(currentLine)
+
+    if (lines.length > maxLines) {
+      const trimmedLines = lines.slice(0, maxLines)
+      trimmedLines[maxLines - 1] = `${trimmedLines[maxLines - 1].replace(/\.*$/, "")}...`
+      return trimmedLines
+    }
+
+    return lines
+  }
+
+  function getSafeFileName(value) {
+    return String(value || "review-graphic")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "") || "review-graphic"
+  }
+
+  function getReviewGraphicOptions() {
+    return {
+      template: reviewGraphicTemplate,
+      size: reviewGraphicSize,
+      fields: reviewGraphicFields,
+    }
+  }
+
+  function toggleReviewGraphicField(fieldName) {
+    setReviewGraphicFields((prev) => ({
+      ...prev,
+      [fieldName]: !prev[fieldName],
+    }))
+  }
+
+  function getReviewGraphicDimensions(size = "square") {
+    if (size === "story") return { width: 1080, height: 1920 }
+    if (size === "pinterest") return { width: 1000, height: 1500 }
+    return { width: 1080, height: 1080 }
+  }
+
+  function getReviewGraphicFacts(reviewItem) {
+    const title = reviewItem?.bookInfo?.title || "Untitled Book"
+    const author = reviewItem?.bookInfo?.author || "Unknown Author"
+    const coverUrl = reviewItem?.bookInfo?.coverUrl || ""
+    const rating = reviewItem?.bookScore || "0"
+    const spice = reviewItem?.metrics?.spice ?? "0"
+    const obsession = reviewItem?.obsessionScore ?? "0"
+    const quote =
+      reviewItem?.review?.oneSentenceReview ||
+      reviewItem?.review?.favoriteThing ||
+      "No review text yet."
+    const vibe = reviewItem?.review?.vibeCheck || "No vibe check added yet."
+    const tropeList = (reviewItem?.tropes || []).slice(0, 6)
+
+    return { title, author, coverUrl, rating, spice, obsession, quote, vibe, tropeList }
+  }
+
+  function buildReviewGraphicSvg(reviewItem, options = {}) {
+    if (!reviewItem) return ""
+
+    const facts = getReviewGraphicFacts(reviewItem)
+    const template = options.template || "scrapbook"
+    const fields = {
+      rating: true,
+      spice: true,
+      obsession: true,
+      review: true,
+      vibe: true,
+      tropes: true,
+      ...(options.fields || {}),
+    }
+    const { width, height } = getReviewGraphicDimensions(options.size || "square")
+    const isTall = height > width
+    const topShift = isTall ? 220 : 0
+    const bottomY = isTall ? height - 435 : 824
+    const footerY = height - 50
+    const coverX = 90
+    const coverY = 262 + topShift
+    const coverW = 280
+    const coverH = 390
+
+    const themes = {
+      scrapbook: {
+        bg: "#221A16",
+        paper: "#F5EBDD",
+        accent: "#B56B6B",
+        gold: "#C29A5A",
+        ink: "#2F2420",
+        label: "#8A4F2A",
+        card: "#F1E4D2",
+        footer: "#2F2420",
+        footerText: "#F3E9DD",
+        lines: 0.72,
+      },
+      minimal: {
+        bg: "#F8F4EE",
+        paper: "#FFFFFF",
+        accent: "#A49484",
+        gold: "#D8C7B1",
+        ink: "#2F2420",
+        label: "#4B3A32",
+        card: "#F5EFE8",
+        footer: "#E6DED4",
+        footerText: "#4B3A32",
+        lines: 0.24,
+      },
+      dark: {
+        bg: "#100C0A",
+        paper: "#211915",
+        accent: "#B56B6B",
+        gold: "#C29A5A",
+        ink: "#F3E9DD",
+        label: "#C29A5A",
+        card: "#2F2420",
+        footer: "#C29A5A",
+        footerText: "#100C0A",
+        lines: 0.22,
+      },
+      soft: {
+        bg: "#F2DCDC",
+        paper: "#FFF7EF",
+        accent: "#B56B6B",
+        gold: "#E8C6B5",
+        ink: "#4B3A32",
+        label: "#A6546D",
+        card: "#FFEDED",
+        footer: "#B56B6B",
+        footerText: "#FFF7EF",
+        lines: 0.48,
+      },
+    }
+    const theme = themes[template] || themes.scrapbook
+
+    const titleLines = getWrappedSvgLines(facts.title, 18, 2)
+    const quoteLines = getWrappedSvgLines(facts.quote, 32, 3)
+    const vibeLines = getWrappedSvgLines(facts.vibe, 28, 3)
+    const tropeText = facts.tropeList.length ? facts.tropeList.join(" • ") : "No tropes selected."
+    const tropeLines = getWrappedSvgLines(tropeText, 30, 3)
+
+    const titleSvg = titleLines
+      .map((line, index) => `<text x="${width / 2}" y="${150 + topShift + index * 52}" class="title" text-anchor="middle">${escapeSvgText(line)}</text>`)
+      .join("")
+
+    const quoteSvg = quoteLines
+      .map((line, index) => `<text x="710" y="${650 + topShift + index * 39}" class="handText" text-anchor="middle">${escapeSvgText(line)}</text>`)
+      .join("")
+
+    const vibeSvg = vibeLines
+      .map((line, index) => `<text x="${width * 0.36}" y="${bottomY + 80 + index * 30}" class="smallText" text-anchor="middle">${escapeSvgText(line)}</text>`)
+      .join("")
+
+    const tropeSvg = tropeLines
+      .map((line, index) => `<text x="${width * 0.72}" y="${bottomY + 80 + index * 30}" class="smallText" text-anchor="middle">${escapeSvgText(line)}</text>`)
+      .join("")
+
+    const coverSvg = facts.coverUrl
+      ? `<image href="${escapeSvgText(facts.coverUrl)}" x="${coverX + 18}" y="${coverY + 32}" width="${coverW - 36}" height="${coverH - 80}" preserveAspectRatio="xMidYMid slice" clip-path="url(#coverClip)" />`
+      : `<rect x="${coverX + 18}" y="${coverY + 32}" width="${coverW - 36}" height="${coverH - 80}" rx="10" class="coverPlaceholder" />
+         <text x="${coverX + coverW / 2}" y="${coverY + 190}" class="placeholderText" text-anchor="middle">No Cover</text>`
+
+    const statItems = []
+    if (fields.rating) statItems.push({ label: "RATING", icon: "⭐", value: `${facts.rating}/5` })
+    if (fields.spice) statItems.push({ label: "SPICE", icon: "🌶️", value: `${facts.spice}/5` })
+    if (fields.obsession) statItems.push({ label: "OBSESSION", icon: "🔥", value: `${facts.obsession}/5` })
+
+    const statStartX = statItems.length === 1 ? 650 : statItems.length === 2 ? 560 : 450
+    const statGap = statItems.length === 2 ? 210 : 180
+    const statSvg = statItems.map((stat, index) => {
+      const x = statStartX + index * statGap
+      const y = 372 + topShift
+      return `<g>
+        <rect x="${x - 72}" y="${y - 52}" width="144" height="172" rx="18" class="statCard" />
+        <text x="${x}" y="${y - 14}" class="label" text-anchor="middle">${escapeSvgText(stat.label)}</text>
+        <text x="${x}" y="${y + 46}" class="statText" text-anchor="middle">${escapeSvgText(stat.icon)}</text>
+        <text x="${x}" y="${y + 98}" class="statText" text-anchor="middle">${escapeSvgText(stat.value)}</text>
+      </g>`
+    }).join("")
+
+    return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
+      <defs>
+        <clipPath id="coverClip"><rect x="${coverX + 18}" y="${coverY + 32}" width="${coverW - 36}" height="${coverH - 80}" rx="10" /></clipPath>
+        <filter id="paperShadow" x="-20%" y="-20%" width="140%" height="140%">
+          <feDropShadow dx="0" dy="12" stdDeviation="12" flood-color="#000000" flood-opacity="0.22" />
+        </filter>
+        <filter id="softShadow" x="-20%" y="-20%" width="140%" height="140%">
+          <feDropShadow dx="0" dy="8" stdDeviation="8" flood-color="#000000" flood-opacity="0.16" />
+        </filter>
+        <pattern id="notebookLines" width="${width}" height="38" patternUnits="userSpaceOnUse">
+          <line x1="0" y1="37" x2="${width}" y2="37" stroke="${theme.accent}" stroke-opacity="0.16" stroke-width="2" />
+        </pattern>
+        <pattern id="gridTape" width="28" height="28" patternUnits="userSpaceOnUse">
+          <path d="M 28 0 L 0 0 0 28" fill="none" stroke="${theme.ink}" stroke-opacity="0.14" stroke-width="1.5" />
+        </pattern>
+        <style>
+          .label { font: 800 22px Georgia, serif; fill: ${theme.label}; letter-spacing: 1.8px; text-transform: uppercase; }
+          .title { font: 800 46px Georgia, serif; fill: ${theme.ink}; }
+          .author { font: 700 24px Georgia, serif; fill: ${theme.ink}; opacity: 0.86; }
+          .statText { font: 800 36px Georgia, serif; fill: ${theme.ink}; }
+          .handText { font: 500 30px Georgia, serif; fill: ${theme.ink}; font-style: italic; }
+          .smallText { font: 600 22px Georgia, serif; fill: ${theme.ink}; }
+          .footer { font: 700 17px Georgia, serif; fill: ${theme.footerText}; letter-spacing: 2.5px; }
+          .placeholderText { font: 700 28px Georgia, serif; fill: #F3E9DD; }
+          .doodle { font: 500 38px Georgia, serif; fill: ${theme.accent}; }
+          .coverPlaceholder { fill: #5C524B; }
+          .statCard { fill: ${theme.card}; stroke: ${theme.accent}; stroke-opacity: 0.32; stroke-width: 2; }
+        </style>
+      </defs>
+
+      <rect width="${width}" height="${height}" fill="${theme.bg}" />
+      <rect x="0" y="0" width="${width}" height="${height}" fill="url(#gridTape)" opacity="0.35" />
+      <path d="M70 ${56 + topShift / 3} L${width - 66} ${44 + topShift / 3} L${width - 42} ${height - 46} L66 ${height - 54} L42 ${128 + topShift / 3} Z" fill="${theme.paper}" filter="url(#paperShadow)" />
+      <rect x="76" y="${90 + topShift / 3}" width="${width - 152}" height="${height - 170 - topShift / 3}" fill="url(#notebookLines)" opacity="${theme.lines}" />
+
+      <path d="M0 ${height - 238} C118 ${height - 290} 232 ${height - 270} 306 ${height - 176} C356 ${height - 110} 352 ${height - 46} 314 ${height} L0 ${height} Z" fill="${theme.gold}" opacity="0.52" />
+      <path d="M${width - 276} 0 L${width} 0 L${width} 156 C${width - 70} 208 ${width - 176} 210 ${width - 238} 140 C${width - 280} 94 ${width - 294} 44 ${width - 276} 0 Z" fill="${theme.accent}" opacity="0.38" />
+
+      <rect x="${width / 2 - 134}" y="${88 + topShift}" width="268" height="46" rx="5" fill="${theme.gold}" opacity="0.62" transform="rotate(-1 ${width / 2} ${111 + topShift})" />
+      <text x="${width / 2}" y="${120 + topShift}" class="label" text-anchor="middle">MINI REVIEW</text>
+      ${titleSvg}
+      <rect x="${width / 2 - 150}" y="${238 + topShift}" width="300" height="44" rx="4" fill="${theme.accent}" opacity="0.28" transform="rotate(-1 ${width / 2} ${260 + topShift})" />
+      <text x="${width / 2}" y="${268 + topShift}" class="author" text-anchor="middle">by ${escapeSvgText(facts.author)}</text>
+
+      <g filter="url(#softShadow)" transform="rotate(-2 ${coverX + coverW / 2} ${coverY + coverH / 2})">
+        <rect x="${coverX}" y="${coverY}" width="${coverW}" height="${coverH}" rx="14" fill="#EEE0CF" />
+        ${coverSvg}
+      </g>
+      <rect x="${coverX + 54}" y="${coverY - 24}" width="164" height="46" rx="3" fill="${theme.gold}" opacity="0.7" transform="rotate(-4 ${coverX + 136} ${coverY - 1})" />
+
+      ${statSvg}
+
+      ${fields.review ? `
+        <text x="710" y="${610 + topShift}" class="label" text-anchor="middle">✧ ONE-SENTENCE REVIEW ✧</text>
+        <path d="M424 ${638 + topShift} L948 ${626 + topShift} L962 ${780 + topShift} L434 ${792 + topShift} Z" fill="${theme.card}" stroke="${theme.accent}" stroke-opacity="0.45" stroke-width="2" stroke-dasharray="8 7" filter="url(#softShadow)" />
+        <text x="466" y="${698 + topShift}" class="doodle" text-anchor="middle">“</text>
+        <text x="910" y="${764 + topShift}" class="doodle" text-anchor="middle">”</text>
+        ${quoteSvg}
+      ` : ""}
+
+      <line x1="90" y1="${bottomY}" x2="${width - 90}" y2="${bottomY}" stroke="${theme.accent}" stroke-opacity="0.34" stroke-width="2" />
+      <line x1="${width / 2}" y1="${bottomY}" x2="${width / 2}" y2="${bottomY + 160}" stroke="${theme.accent}" stroke-opacity="0.34" stroke-width="2" stroke-dasharray="6 7" />
+
+      ${fields.vibe ? `<text x="${width * 0.36}" y="${bottomY + 40}" class="label" text-anchor="middle">VIBE CHECK</text>${vibeSvg}` : ""}
+      ${fields.tropes ? `<text x="${width * 0.72}" y="${bottomY + 40}" class="label" text-anchor="middle">TROPES I LOVED</text>${tropeSvg}` : ""}
+
+      <rect x="${width / 2 - 250}" y="${footerY - 34}" width="500" height="54" rx="5" fill="${theme.footer}" transform="rotate(-1 ${width / 2} ${footerY - 7})" />
+      <text x="${width / 2}" y="${footerY}" class="footer" text-anchor="middle" textLength="330" lengthAdjust="spacingAndGlyphs">READ • RATE • ROMANTICIZE ♡</text>
+    </svg>`
+  }
+
+  function getReviewGraphicDataUrl(reviewItem, options = {}) {
+    return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(buildReviewGraphicSvg(reviewItem, options))}`
+  }
+
+  function downloadSvgFile(reviewItem, options = {}) {
+    const svg = buildReviewGraphicSvg(reviewItem, options)
+    const blob = new Blob([svg], { type: "image/svg+xml;charset=utf-8" })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement("a")
+    link.href = url
+    link.download = `${getSafeFileName(reviewItem?.bookInfo?.title)}-review-graphic.svg`
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    URL.revokeObjectURL(url)
+  }
+
+  function downloadReviewGraphicPng(reviewItem, options = {}) {
+    const svgUrl = getReviewGraphicDataUrl(reviewItem, options)
+    const image = new Image()
+    image.crossOrigin = "anonymous"
+
+    image.onload = () => {
+      const { width, height } = getReviewGraphicDimensions(options.size || "square")
+      const canvas = document.createElement("canvas")
+      canvas.width = width
+      canvas.height = height
+      const context = canvas.getContext("2d")
+      context.drawImage(image, 0, 0)
+
+      const link = document.createElement("a")
+      link.download = `${getSafeFileName(reviewItem?.bookInfo?.title)}-review-graphic.png`
+      link.href = canvas.toDataURL("image/png")
+      link.click()
+      setSaveMessage("Review graphic downloaded ✨")
+    }
+
+    image.onerror = () => {
+      setSaveMessage("PNG download had trouble with this cover image. Downloaded an SVG backup instead.")
+      downloadSvgFile(reviewItem, options)
+    }
+
+    image.src = svgUrl
+  }
+
+  function buildReviewCaption(reviewItem, platform = "instagram") {
+    if (!reviewItem) return ""
+
+    const facts = getReviewGraphicFacts(reviewItem)
+    const ratingLine = `⭐ ${facts.rating}/5  |  🌶️ ${facts.spice}/5  |  🔥 ${facts.obsession}/5`
+    const titleLine = `${facts.title} by ${facts.author}`
+    const quoteLine = facts.quote ? `"${facts.quote}"` : ""
+    const vibeLine = facts.vibe ? `Vibe check: ${facts.vibe}` : ""
+    const tropesLine =
+      facts.tropeList.length > 0
+        ? `Tropes: ${facts.tropeList.join(" • ")}`
+        : ""
+
+    if (platform === "story") {
+      return [
+        titleLine,
+        ratingLine,
+        quoteLine,
+        "",
+        "Would you add this to your TBR?",
+      ]
+        .filter(Boolean)
+        .join("\n")
+    }
+
+    if (platform === "pinterest") {
+      return [
+        `${facts.title} book review`,
+        ratingLine,
+        quoteLine,
+        vibeLine,
+        tropesLine,
+        "",
+        "Save this romance book review for your next TBR add.",
+        "#romancebooks #bookreview #bookrecommendations #tbr",
+      ]
+        .filter(Boolean)
+        .join("\n")
+    }
+
+    if (platform === "facebook") {
+      return [
+        `I finished ${titleLine} and had thoughts 📚`,
+        ratingLine,
+        quoteLine,
+        vibeLine,
+        tropesLine,
+        "",
+        "Have you read this one yet?",
+      ]
+        .filter(Boolean)
+        .join("\n")
+    }
+
+    return [
+      `Mini review: ${titleLine}`,
+      ratingLine,
+      "",
+      quoteLine,
+      vibeLine,
+      tropesLine,
+      "",
+      "#romancereader #romancebooks #bookreview #kindleunlimited #bookstagram #tbr",
+    ]
+      .filter(Boolean)
+      .join("\n")
+  }
+
+  async function copyReviewCaption(reviewItem, platform = reviewCaptionPlatform) {
+    const caption = buildReviewCaption(reviewItem, platform)
+
+    try {
+      await navigator.clipboard.writeText(caption)
+      setSaveMessage("Caption copied to clipboard 📋")
+    } catch (error) {
+      console.error("Error copying caption:", error)
+      setSaveMessage("Could not copy automatically. You can select and copy the caption text manually.")
+    }
+  }
+
+  function downloadSocialGraphic(reviewItem, size) {
+    setReviewGraphicSize(size)
+    downloadReviewGraphicPng(reviewItem, {
+      ...getReviewGraphicOptions(),
+      size,
+    })
+  }
+
   function getReadingStreakStats() {
     const logs = getAllReadingLogs()
     const logsByDate = {}
@@ -612,6 +1110,98 @@ ${review.vibeCheck}`
     }
   }
 
+
+  function shiftCalendarMonth(amount) {
+    const [year, month] = calendarMonthKey.split("-").map(Number)
+    const nextMonth = new Date(year, month - 1 + amount, 1)
+    const nextMonthKey = `${nextMonth.getFullYear()}-${String(
+      nextMonth.getMonth() + 1
+    ).padStart(2, "0")}`
+
+    setCalendarMonthKey(nextMonthKey)
+    setSelectedCalendarDate(`${nextMonthKey}-01`)
+  }
+
+  function getReadingCalendarStats(monthKey) {
+    const [year, month] = monthKey.split("-").map(Number)
+    const firstDay = new Date(year, month - 1, 1)
+    const daysInMonth = new Date(year, month, 0).getDate()
+    const startingWeekday = firstDay.getDay()
+    const logs = getAllReadingLogs()
+
+    const bookTitleById = savedReviews.reduce((lookup, item) => {
+      lookup[item.id] = item.bookInfo?.title || "Untitled Book"
+      return lookup
+    }, {})
+
+    const logsByDate = logs.reduce((lookup, log) => {
+      if (!log.date || !log.date.startsWith(monthKey)) return lookup
+
+      if (!lookup[log.date]) {
+        lookup[log.date] = {
+          date: log.date,
+          pages: 0,
+          minutes: 0,
+          sessions: 0,
+          books: new Set(),
+          logs: [],
+        }
+      }
+
+      lookup[log.date].pages += Number(log.pagesRead || 0)
+      lookup[log.date].minutes += Number(log.minutesRead || 0)
+      lookup[log.date].sessions += 1
+
+      if (log.bookId) {
+        lookup[log.date].books.add(log.bookId)
+      }
+
+      lookup[log.date].logs.push({
+        ...log,
+        title: bookTitleById[log.bookId] || log.title || "Untitled Book",
+      })
+
+      return lookup
+    }, {})
+
+    const calendarDays = []
+
+    for (let i = 0; i < startingWeekday; i += 1) {
+      calendarDays.push(null)
+    }
+
+    for (let day = 1; day <= daysInMonth; day += 1) {
+      const date = `${monthKey}-${String(day).padStart(2, "0")}`
+      const dateData = logsByDate[date]
+
+      calendarDays.push({
+        date,
+        day,
+        pages: dateData?.pages || 0,
+        minutes: dateData?.minutes || 0,
+        sessions: dateData?.sessions || 0,
+        bookCount: dateData?.books?.size || 0,
+        logs: dateData?.logs || [],
+      })
+    }
+
+    const monthTotals = Object.values(logsByDate)
+    const totalPages = monthTotals.reduce((sum, day) => sum + day.pages, 0)
+    const totalMinutes = monthTotals.reduce((sum, day) => sum + day.minutes, 0)
+
+    return {
+      monthLabel: firstDay.toLocaleDateString("en-US", {
+        month: "long",
+        year: "numeric",
+      }),
+      calendarDays,
+      selectedDay: calendarDays.find((day) => day?.date === selectedCalendarDate),
+      totalDaysRead: monthTotals.length,
+      totalPages,
+      totalMinutes,
+      totalHours: Math.round((totalMinutes / 60) * 10) / 10,
+    }
+  }
 
   function getReadingAnalyticsStats() {
     const logs = getAllReadingLogs()
@@ -723,6 +1313,8 @@ ${review.vibeCheck}`
 
   const readingStreakStats = getReadingStreakStats()
   const readingAnalyticsStats = getReadingAnalyticsStats()
+  const readingCalendarStats = getReadingCalendarStats(calendarMonthKey)
+  const readingGoalStats = getReadingGoalStats()
 
   const currentYear = new Date().getFullYear()
 
@@ -1587,6 +2179,14 @@ ${percent}%`
     return () => subscription.unsubscribe()
   }, [])
 
+
+  useEffect(() => {
+    localStorage.setItem(
+      "brainChemistryBooksReadingGoals",
+      JSON.stringify(readingGoals)
+    )
+  }, [readingGoals])
+
   return (
     <main>
       {step === "home" && (
@@ -1661,6 +2261,171 @@ ${percent}%`
           <p>Built from your reading log entries, finished dates, pages, minutes, and notes.</p>
 
           {saveMessage && <p>{saveMessage}</p>}
+
+          <div className="score-card">
+            <p>🎯 Reading Goals for {readingGoalStats.currentYearKey}</p>
+
+            <div className="review-field">
+              <label>Books Goal</label>
+              <input
+                type="number"
+                min="0"
+                value={readingGoals.books}
+                onChange={(e) => updateReadingGoal("books", e.target.value)}
+                placeholder="Example: 75"
+              />
+            </div>
+
+            <p>{readingGoalStats.booksFinishedThisYear} / {readingGoals.books || 0} books finished</p>
+            <ProgressBar percent={readingGoalStats.booksPercent} />
+
+            <div className="review-field">
+              <label>Pages Goal</label>
+              <input
+                type="number"
+                min="0"
+                value={readingGoals.pages}
+                onChange={(e) => updateReadingGoal("pages", e.target.value)}
+                placeholder="Example: 20000"
+              />
+            </div>
+
+            <p>{readingGoalStats.pagesThisYear} / {readingGoals.pages || 0} pages read</p>
+            <ProgressBar percent={readingGoalStats.pagesPercent} />
+
+            <div className="review-field">
+              <label>Reading Days Goal</label>
+              <input
+                type="number"
+                min="0"
+                value={readingGoals.readingDays}
+                onChange={(e) => updateReadingGoal("readingDays", e.target.value)}
+                placeholder="Example: 200"
+              />
+            </div>
+
+            <p>{readingGoalStats.readingDaysThisYear} / {readingGoals.readingDays || 0} reading days</p>
+            <ProgressBar percent={readingGoalStats.readingDaysPercent} />
+
+            <div className="review-field">
+              <label>Minutes Goal</label>
+              <input
+                type="number"
+                min="0"
+                value={readingGoals.minutes}
+                onChange={(e) => updateReadingGoal("minutes", e.target.value)}
+                placeholder="Example: 6000"
+              />
+            </div>
+
+            <p>{readingGoalStats.minutesThisYear} / {readingGoals.minutes || 0} minutes read ({readingGoalStats.hoursThisYear} hours)</p>
+            <ProgressBar percent={readingGoalStats.minutesPercent} />
+          </div>
+
+          <div className="score-card">
+            <p>📅 Reading Calendar</p>
+
+            <div
+              style={{
+                display: "flex",
+                gap: "0.75rem",
+                alignItems: "center",
+                justifyContent: "space-between",
+                flexWrap: "wrap",
+              }}
+            >
+              <button onClick={() => shiftCalendarMonth(-1)}>← Previous Month</button>
+              <h2 style={{ margin: 0 }}>{readingCalendarStats.monthLabel}</h2>
+              <button onClick={() => shiftCalendarMonth(1)}>Next Month →</button>
+            </div>
+
+            <p>
+              {readingCalendarStats.totalDaysRead} reading day{readingCalendarStats.totalDaysRead === 1 ? "" : "s"} •{" "}
+              {readingCalendarStats.totalPages} pages
+              {readingCalendarStats.totalMinutes
+                ? ` • ${readingCalendarStats.totalHours} hours`
+                : ""}
+            </p>
+
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(7, minmax(0, 1fr))",
+                gap: "0.35rem",
+                marginTop: "1rem",
+              }}
+            >
+              {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((dayName) => (
+                <strong key={dayName} style={{ textAlign: "center", fontSize: "0.8rem" }}>
+                  {dayName}
+                </strong>
+              ))}
+
+              {readingCalendarStats.calendarDays.map((day, index) =>
+                day ? (
+                  <button
+                    key={day.date}
+                    onClick={() => setSelectedCalendarDate(day.date)}
+                    style={{
+                      minHeight: "4.5rem",
+                      padding: "0.4rem",
+                      border:
+                        selectedCalendarDate === day.date
+                          ? "2px solid #2f2420"
+                          : "1px solid rgba(47, 36, 32, 0.2)",
+                      borderRadius: "0.75rem",
+                      background: day.sessions
+                        ? "rgba(166, 84, 52, 0.16)"
+                        : "rgba(255, 255, 255, 0.45)",
+                      color: "#2f2420",
+                      textAlign: "left",
+                    }}
+                  >
+                    <strong>{day.day}</strong>
+                    {day.sessions > 0 && (
+                      <>
+                        <br />
+                        <span>{day.pages} pg</span>
+                        <br />
+                        <span>
+                          {day.sessions} log{day.sessions === 1 ? "" : "s"}
+                        </span>
+                      </>
+                    )}
+                  </button>
+                ) : (
+                  <div key={`blank-${index}`} />
+                )
+              )}
+            </div>
+
+            <div style={{ marginTop: "1rem" }}>
+              <p>
+                <strong>
+                  {selectedCalendarDate
+                    ? formatDateKey(selectedCalendarDate)
+                    : "Select a day"}
+                </strong>
+              </p>
+
+              {readingCalendarStats.selectedDay?.logs?.length ? (
+                readingCalendarStats.selectedDay.logs.map((log) => (
+                  <div key={log.id} style={{ marginBottom: "0.75rem" }}>
+                    <p>
+                      <strong>{log.title}</strong>
+                      <br />
+                      {log.pagesRead || 0} pages
+                      {log.endPage ? ` • ended on page ${log.endPage}` : ""}
+                      {log.minutesRead ? ` • ${log.minutesRead} minutes` : ""}
+                    </p>
+                    {log.notes && <p>📝 {log.notes}</p>}
+                  </div>
+                ))
+              ) : (
+                <p>No reading logged for this day.</p>
+              )}
+            </div>
+          </div>
 
           {savedReviews.length > 0 && (
             <div className="score-card">
@@ -2260,11 +3025,128 @@ ${percent}%`
             </>
           )}
 
+          {selectedReview.bookInfo.status === "Finished" && (
+            <button onClick={() => setStep("reviewGraphic")}>
+              🎨 Generate Review Graphic
+            </button>
+          )}
+
           <button onClick={() => setStep("library")}>Back to Library</button>
           <button onClick={() => editReview(selectedReview)}>Edit Review / Dates</button>
           <button onClick={() => deleteReview(selectedReview.id)}>
             Delete Review
           </button>
+        </section>
+      )}
+
+      {step === "reviewGraphic" && selectedReview && (
+        <section>
+          <p>Review Graphic Generator</p>
+          <h1>{selectedReview.bookInfo.title || "Untitled Book"}</h1>
+          <p>Mini-review graphic, pulled from this saved review.</p>
+
+          <div className="score-card">
+            <p>Graphic Settings</p>
+
+            <label>
+              Template
+              <select value={reviewGraphicTemplate} onChange={(event) => setReviewGraphicTemplate(event.target.value)}>
+                <option value="scrapbook">Scrapbook</option>
+                <option value="minimal">Minimal</option>
+                <option value="dark">Dark Romance</option>
+                <option value="soft">Soft Romance</option>
+              </select>
+            </label>
+
+            <label>
+              Export Size
+              <select value={reviewGraphicSize} onChange={(event) => setReviewGraphicSize(event.target.value)}>
+                <option value="square">Square Post</option>
+                <option value="story">Instagram/Facebook Story</option>
+                <option value="pinterest">Pinterest</option>
+              </select>
+            </label>
+
+            <div className="button-row">
+              {Object.entries({
+                rating: "Rating",
+                spice: "Spice",
+                obsession: "Obsession",
+                review: "One-Sentence Review",
+                vibe: "Vibe Check",
+                tropes: "Tropes",
+              }).map(([field, label]) => (
+                <button
+                  key={field}
+                  type="button"
+                  className={reviewGraphicFields[field] ? "filter-button active" : "filter-button"}
+                  onClick={() => toggleReviewGraphicField(field)}
+                >
+                  {reviewGraphicFields[field] ? "✓" : "+"} {label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="score-card">
+            <p>Preview</p>
+            <img
+              src={getReviewGraphicDataUrl(selectedReview, getReviewGraphicOptions())}
+              alt="Generated review graphic preview"
+              className="review-graphic"
+            />
+          </div>
+
+          <div className="score-card">
+            <p>Social Export</p>
+            <p>Download the review graphic in the format you need.</p>
+
+            <div className="button-row">
+              <button type="button" onClick={() => downloadSocialGraphic(selectedReview, "square")}>
+                Download Square Post
+              </button>
+              <button type="button" onClick={() => downloadSocialGraphic(selectedReview, "story")}>
+                Download Story
+              </button>
+              <button type="button" onClick={() => downloadSocialGraphic(selectedReview, "pinterest")}>
+                Download Pinterest Pin
+              </button>
+            </div>
+          </div>
+
+          <div className="score-card">
+            <p>Auto Caption</p>
+
+            <label>
+              Caption Style
+              <select
+                value={reviewCaptionPlatform}
+                onChange={(event) => setReviewCaptionPlatform(event.target.value)}
+              >
+                <option value="instagram">Instagram Feed</option>
+                <option value="story">Instagram/Facebook Story</option>
+                <option value="facebook">Facebook Post</option>
+                <option value="pinterest">Pinterest Pin</option>
+              </select>
+            </label>
+
+            <pre>{buildReviewCaption(selectedReview, reviewCaptionPlatform)}</pre>
+
+            <button type="button" onClick={() => copyReviewCaption(selectedReview)}>
+              📋 Copy Caption
+            </button>
+          </div>
+
+          {saveMessage && <p>{saveMessage}</p>}
+
+          <button onClick={() => downloadReviewGraphicPng(selectedReview, getReviewGraphicOptions())}>
+            Download Current Preview PNG
+          </button>
+          <button onClick={() => downloadSvgFile(selectedReview, getReviewGraphicOptions())}>
+            Download SVG Backup
+          </button>
+          <button onClick={() => setStep("viewReview")}>Back to Review</button>
+          <button onClick={() => setStep("library")}>Back to Library</button>
         </section>
       )}
 
