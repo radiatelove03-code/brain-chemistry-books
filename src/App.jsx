@@ -24,6 +24,7 @@ function App() {
   const [step, setStep] = useState("home")
   const [user, setUser] = useState(null)
   const [selectedReview, setSelectedReview] = useState(null)
+  const [selectedReadingLogBookId, setSelectedReadingLogBookId] = useState(null)
   const [editingReviewId, setEditingReviewId] = useState(null)
   const [libraryFilter, setLibraryFilter] = useState("all")
 
@@ -44,6 +45,8 @@ function App() {
     status: "Finished",
     totalPages: "",
     currentPage: "",
+    dateStarted: "",
+    dateFinished: "",
   })
 
   const [dnfInfo, setDnfInfo] = useState({
@@ -81,6 +84,12 @@ function App() {
   const [recommendationLevel, setRecommendationLevel] = useState("Recommend")
   const [isFavorite, setIsFavorite] = useState(false)
   const [saveMessage, setSaveMessage] = useState("")
+  const [progressInputs, setProgressInputs] = useState({})
+  const [readingLogDrafts, setReadingLogDrafts] = useState({})
+  const [readingLogDirty, setReadingLogDirty] = useState({})
+  const [readingLogs, setReadingLogs] = useState([])
+  const [readingLogMinutesInputs, setReadingLogMinutesInputs] = useState({})
+  const [readingLogNoteInputs, setReadingLogNoteInputs] = useState({})
 
   const filteredReviews = savedReviews.filter((item) => {
     if (libraryFilter === "favorites") return item.isFavorite
@@ -99,6 +108,11 @@ function App() {
   )
   const currentlyReadingReviews = savedReviews.filter(
     (item) => item.bookInfo.status === "Reading"
+  )
+
+  const embeddedReadingLogCount = savedReviews.reduce(
+    (sum, item) => sum + (item.readingLogs || []).length,
+    0
   )
 
   const averageRating =
@@ -199,6 +213,8 @@ function App() {
       status: "Finished",
       totalPages: "",
       currentPage: "",
+      dateStarted: "",
+      dateFinished: "",
     })
 
     setDnfInfo({
@@ -265,6 +281,21 @@ function App() {
         setSaveMessage(error.message)
         return
       }
+
+      const { error: readingLogError } = await supabase
+        .from("reading_logs")
+        .delete()
+        .eq("book_id", reviewId)
+        .eq("user_id", user.id)
+
+      if (readingLogError) {
+        setSaveMessage(readingLogError.message)
+        return
+      }
+
+      setReadingLogs((currentLogs) =>
+        currentLogs.filter((log) => log.bookId !== reviewId)
+      )
     }
 
     const updatedReviews = savedReviews.filter((item) => item.id !== reviewId)
@@ -282,7 +313,59 @@ function App() {
     setStep("library")
   }
 
+  function finishBook(reviewItem) {
+    setBookInfo({
+      ...reviewItem.bookInfo,
+      status: "Finished",
+      currentPage: reviewItem.bookInfo.totalPages,
+      dateStarted: reviewItem.bookInfo.dateStarted || new Date().toISOString(),
+      dateFinished: new Date().toISOString(),
+    })
+
+    setDnfInfo({
+      percent: "",
+      reason: "",
+      wouldReadAuthorAgain: "Maybe",
+    })
+
+    setScores({
+      plot: 0,
+      vibe: 0,
+      characters: 0,
+      writingStyle: 0,
+      enjoyability: 0,
+    })
+
+    setMetrics({
+      spice: 0,
+      chemistry: 0,
+      tension: 0,
+      emotionalDamage: 0,
+      bookHangover: 0,
+      contentIntensity: 0,
+    })
+
+    setReview({
+      oneSentenceReview: "",
+      favoriteThing: "",
+      biggestComplaint: "",
+      vibeCheck: "",
+    })
+
+    setTropes([])
+    setObsessionScore(5)
+    setRecommendationLevel("Recommend")
+    setIsFavorite(false)
+
+    setEditingReviewId(reviewItem.id)
+    setSelectedReview(null)
+    setSaveMessage("")
+
+    setStep(1)
+  }
+
   function editReview(reviewItem) {
+
     setBookInfo(reviewItem.bookInfo)
 
     setDnfInfo(
@@ -373,6 +456,282 @@ ${review.vibeCheck}`
     return Math.min(100, Math.max(0, percent))
   }
 
+  function formatDate(dateString) {
+    if (!dateString) return ""
+
+    return new Date(dateString).toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    })
+  }
+
+  function getDaysToRead(reviewItem) {
+    if (
+      !reviewItem.bookInfo.dateStarted ||
+      !reviewItem.bookInfo.dateFinished
+    ) {
+      return null
+    }
+
+    const started = new Date(reviewItem.bookInfo.dateStarted)
+    const finished = new Date(reviewItem.bookInfo.dateFinished)
+    const diffMs = finished - started
+
+    return Math.max(1, Math.ceil(diffMs / (1000 * 60 * 60 * 24)))
+  }
+
+
+  function getLocalDateKey(dateValue = new Date()) {
+    const date = new Date(dateValue)
+    const year = date.getFullYear()
+    const month = String(date.getMonth() + 1).padStart(2, "0")
+    const day = String(date.getDate()).padStart(2, "0")
+    return `${year}-${month}-${day}`
+  }
+
+  function formatDateKey(dateKey) {
+    if (!dateKey) return ""
+
+    return new Date(`${dateKey}T12:00:00`).toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    })
+  }
+
+  function getBookReadingLogs(bookId) {
+    const book = savedReviews.find((item) => item.id === bookId)
+    const embeddedLogs = book?.readingLogs || []
+
+    if (user) {
+      const cloudLogs = readingLogs.filter((log) => log.bookId === bookId)
+      return cloudLogs.length > 0 ? cloudLogs : embeddedLogs
+    }
+
+    return embeddedLogs
+  }
+
+  function getAllReadingLogs() {
+    if (user) {
+      const cloudBookIds = new Set(readingLogs.map((log) => log.bookId))
+      const embeddedLogsWithoutCloudCopies = savedReviews.flatMap((item) => {
+        if (cloudBookIds.has(item.id)) return []
+
+        return (item.readingLogs || []).map((log) => ({
+          ...log,
+          bookId: item.id,
+          title: item.bookInfo?.title || "Untitled Book",
+        }))
+      })
+
+      const cloudLogs = readingLogs.map((log) => {
+        const book = savedReviews.find((item) => item.id === log.bookId)
+        return {
+          ...log,
+          title: book?.bookInfo?.title || "Untitled Book",
+        }
+      })
+
+      return [...cloudLogs, ...embeddedLogsWithoutCloudCopies]
+    }
+
+    return savedReviews.flatMap((item) =>
+      (item.readingLogs || []).map((log) => ({
+        ...log,
+        bookId: item.id,
+        title: item.bookInfo?.title || "Untitled Book",
+      }))
+    )
+  }
+
+  function getReadingStreakStats() {
+    const logs = getAllReadingLogs()
+    const logsByDate = {}
+
+    logs.forEach((log) => {
+      if (!log.date) return
+      logsByDate[log.date] = (logsByDate[log.date] || 0) + Number(log.pagesRead || 0)
+    })
+
+    const loggedDates = Object.keys(logsByDate)
+      .filter((date) => logsByDate[date] > 0)
+      .sort()
+
+    let longestStreak = 0
+    let runningStreak = 0
+    let previousDate = null
+
+    loggedDates.forEach((dateKey) => {
+      const currentDate = new Date(`${dateKey}T12:00:00`)
+
+      if (!previousDate) {
+        runningStreak = 1
+      } else {
+        const diffDays = Math.round(
+          (currentDate - previousDate) / (1000 * 60 * 60 * 24)
+        )
+        runningStreak = diffDays === 1 ? runningStreak + 1 : 1
+      }
+
+      longestStreak = Math.max(longestStreak, runningStreak)
+      previousDate = currentDate
+    })
+
+    const today = getLocalDateKey()
+    const yesterdayDate = new Date()
+    yesterdayDate.setDate(yesterdayDate.getDate() - 1)
+    const yesterday = getLocalDateKey(yesterdayDate)
+    const lastLoggedDate = loggedDates[loggedDates.length - 1]
+
+    let currentStreak = 0
+
+    if (lastLoggedDate === today || lastLoggedDate === yesterday) {
+      currentStreak = 1
+      for (let index = loggedDates.length - 2; index >= 0; index -= 1) {
+        const newerDate = new Date(`${loggedDates[index + 1]}T12:00:00`)
+        const olderDate = new Date(`${loggedDates[index]}T12:00:00`)
+        const diffDays = Math.round(
+          (newerDate - olderDate) / (1000 * 60 * 60 * 24)
+        )
+
+        if (diffDays === 1) {
+          currentStreak += 1
+        } else {
+          break
+        }
+      }
+    }
+
+    return {
+      currentStreak: currentStreak >= 2 ? currentStreak : 0,
+      longestStreak: longestStreak >= 2 ? longestStreak : 0,
+      daysLogged: loggedDates.length,
+      pagesLogged: logs.reduce((sum, log) => sum + Number(log.pagesRead || 0), 0),
+      lastLoggedDate,
+    }
+  }
+
+
+  function getReadingAnalyticsStats() {
+    const logs = getAllReadingLogs()
+    const today = new Date()
+    const currentYearKey = String(today.getFullYear())
+    const currentMonthKey = getLocalDateKey(today).slice(0, 7)
+
+    const logsThisYear = logs.filter((log) => (log.date || "").startsWith(currentYearKey))
+    const logsThisMonth = logs.filter((log) => (log.date || "").startsWith(currentMonthKey))
+
+    const sumPages = (items) =>
+      items.reduce((sum, log) => sum + Number(log.pagesRead || 0), 0)
+
+    const sumMinutes = (items) =>
+      items.reduce((sum, log) => sum + Number(log.minutesRead || 0), 0)
+
+    const buildDateTotals = (items) => {
+      const totals = {}
+
+      items.forEach((log) => {
+        if (!log.date) return
+
+        if (!totals[log.date]) {
+          totals[log.date] = {
+            date: log.date,
+            pages: 0,
+            minutes: 0,
+            sessions: 0,
+          }
+        }
+
+        totals[log.date].pages += Number(log.pagesRead || 0)
+        totals[log.date].minutes += Number(log.minutesRead || 0)
+        totals[log.date].sessions += 1
+      })
+
+      return Object.values(totals).sort((a, b) => a.date.localeCompare(b.date))
+    }
+
+    const dateTotals = buildDateTotals(logs)
+    const monthDateTotals = buildDateTotals(logsThisMonth)
+    const yearDateTotals = buildDateTotals(logsThisYear)
+    const biggestReadingDay = [...dateTotals].sort((a, b) => b.pages - a.pages)[0]
+
+    const totalPages = sumPages(logs)
+    const totalMinutes = sumMinutes(logs)
+    const pagesThisMonth = sumPages(logsThisMonth)
+    const pagesThisYear = sumPages(logsThisYear)
+    const minutesThisMonth = sumMinutes(logsThisMonth)
+    const minutesThisYear = sumMinutes(logsThisYear)
+
+    const finishedThisMonth = finishedReviews.filter((item) =>
+      (item.bookInfo.dateFinished || "").startsWith(currentMonthKey)
+    )
+
+    const finishedWithDays = finishedReviews
+      .map((item) => ({ item, days: getDaysToRead(item) }))
+      .filter((entry) => entry.days)
+
+    const fastestRead = [...finishedWithDays].sort((a, b) => a.days - b.days)[0]
+    const slowestRead = [...finishedWithDays].sort((a, b) => b.days - a.days)[0]
+
+    const averageDaysToFinish = finishedWithDays.length
+      ? Math.round(
+          (finishedWithDays.reduce((sum, entry) => sum + entry.days, 0) /
+            finishedWithDays.length) *
+            10
+        ) / 10
+      : 0
+
+    const averagePagesPerReadingDay = dateTotals.length
+      ? Math.round((totalPages / dateTotals.length) * 10) / 10
+      : 0
+
+    const averageSessionLength = logs.length && totalMinutes
+      ? Math.round((totalMinutes / logs.length) * 10) / 10
+      : 0
+
+    const pagesPerHour = totalMinutes
+      ? Math.round((totalPages / (totalMinutes / 60)) * 10) / 10
+      : 0
+
+    return {
+      currentMonthLabel: today.toLocaleDateString("en-US", {
+        month: "long",
+        year: "numeric",
+      }),
+      currentYearKey,
+      readingDaysThisMonth: monthDateTotals.length,
+      readingDaysThisYear: yearDateTotals.length,
+      pagesThisMonth,
+      pagesThisYear,
+      totalPages,
+      minutesThisMonth,
+      minutesThisYear,
+      totalMinutes,
+      totalHours: Math.round((totalMinutes / 60) * 10) / 10,
+      averagePagesPerReadingDay,
+      averageSessionLength,
+      pagesPerHour,
+      biggestReadingDay,
+      finishedThisMonth: finishedThisMonth.length,
+      averageDaysToFinish,
+      fastestRead,
+      slowestRead,
+      totalSessions: logs.length,
+    }
+  }
+
+  const readingStreakStats = getReadingStreakStats()
+  const readingAnalyticsStats = getReadingAnalyticsStats()
+
+  const currentYear = new Date().getFullYear()
+
+  const yearToDateCount = finishedReviews.filter((item) => {
+    if (!item.bookInfo.dateFinished) return false
+
+    return new Date(item.bookInfo.dateFinished).getFullYear() === currentYear
+  }).length
+
   const readingProgressPercent = getProgressPercent(bookInfo)
 
   const dnfReviewText = `🚫 DNF
@@ -411,9 +770,25 @@ ${readingProgressPercent}%`
     const isShelfOnly = bookInfo.status === "Reading" || bookInfo.status === "TBR"
     const reviewId = editingReviewId || crypto.randomUUID()
 
+    const now = new Date().toISOString()
+
+    const bookInfoWithDates = {
+      ...bookInfo,
+      dateStarted:
+        bookInfo.dateStarted ||
+        (bookInfo.status === "Reading" || bookInfo.status === "TBR"
+          ? now
+          : ""),
+      dateFinished:
+        bookInfo.dateFinished ||
+        (bookInfo.status === "Finished"
+          ? now
+          : ""),
+    }
+
     const reviewToSave = {
       id: reviewId,
-      bookInfo,
+      bookInfo: bookInfoWithDates,
       dnfInfo: isDnf ? dnfInfo : null,
       scores: isDnf || isShelfOnly ? null : scores,
       metrics: isDnf || isShelfOnly ? null : metrics,
@@ -424,6 +799,9 @@ ${readingProgressPercent}%`
       isFavorite: isDnf || isShelfOnly ? false : isFavorite,
       bookScore: isDnf || isShelfOnly ? null : bookScore.toFixed(1),
       miniReviewText: isDnf ? dnfReviewText : isShelfOnly ? readingReviewText : miniReviewText,
+      readingLogs: editingReviewId
+        ? savedReviews.find((item) => item.id === editingReviewId)?.readingLogs || []
+        : [],
       savedAt: editingReviewId
         ? savedReviews.find((item) => item.id === editingReviewId)?.savedAt ||
           new Date().toISOString()
@@ -495,40 +873,8 @@ ${readingProgressPercent}%`
     }
   }
 
-  async function updateReadingProgress(reviewId, newCurrentPage) {
-    const updatedReviews = savedReviews.map((item) => {
-      if (item.id !== reviewId) return item
-
-      const updatedItem = {
-        ...item,
-        bookInfo: {
-          ...item.bookInfo,
-          currentPage: newCurrentPage,
-        },
-        updatedAt: new Date().toISOString(),
-      }
-
-      const percent = getProgressPercent(updatedItem.bookInfo)
-      updatedItem.miniReviewText = `📖 Currently Reading
-
-📖 Book:
-${updatedItem.bookInfo.title || "Untitled Book"}
-
-✍️ Author:
-${updatedItem.bookInfo.author || "Unknown Author"}
-
-📍 Progress:
-Page ${updatedItem.bookInfo.currentPage || "0"} of ${updatedItem.bookInfo.totalPages || "?"}
-
-📊 Percent Complete:
-${percent}%`
-
-      return updatedItem
-    })
-
+  async function saveReviewsToStorage(updatedReviews, changedReview, reviewId) {
     setSavedReviews(updatedReviews)
-
-    const changedReview = updatedReviews.find((item) => item.id === reviewId)
 
     if (user && changedReview) {
       const { error } = await supabase
@@ -542,7 +888,7 @@ ${percent}%`
 
       if (error) {
         setSaveMessage(error.message)
-        return
+        return false
       }
     }
 
@@ -552,6 +898,559 @@ ${percent}%`
         JSON.stringify(updatedReviews)
       )
     }
+
+    return true
+  }
+
+  async function logReadingProgress(reviewId) {
+    const reviewItem = savedReviews.find((item) => item.id === reviewId)
+    if (!reviewItem) return
+
+    const startingPage = Number(reviewItem.bookInfo.currentPage || 0)
+    const newCurrentPage = Number(
+      progressInputs[reviewId] ?? reviewItem.bookInfo.currentPage ?? 0
+    )
+    const totalPages = Number(reviewItem.bookInfo.totalPages || 0)
+    const minutesReadValue = readingLogMinutesInputs[reviewId]
+    const notesValue = readingLogNoteInputs[reviewId] || ""
+
+    if (!newCurrentPage || newCurrentPage <= startingPage) {
+      setSaveMessage("Add a higher page number before logging reading.")
+      return
+    }
+
+    if (totalPages && newCurrentPage > totalPages) {
+      setSaveMessage("That page number is higher than the book's total pages.")
+      return
+    }
+
+    const pagesRead = newCurrentPage - startingPage
+    const today = getLocalDateKey()
+
+    if (user) {
+      const existingLog = readingLogs.find(
+        (log) => log.bookId === reviewId && log.date === today
+      )
+      let savedLog = null
+
+      if (existingLog) {
+        const updates = {
+          pages_read: Number(existingLog.pagesRead || 0) + pagesRead,
+          end_page: newCurrentPage,
+          minutes_read:
+            minutesReadValue === "" || minutesReadValue === undefined
+              ? existingLog.minutesRead || null
+              : Number(existingLog.minutesRead || 0) + Number(minutesReadValue || 0),
+          notes: notesValue.trim()
+            ? [existingLog.notes, notesValue.trim()].filter(Boolean).join("\n")
+            : existingLog.notes || null,
+        }
+
+        const { data, error } = await supabase
+          .from("reading_logs")
+          .update(updates)
+          .eq("id", existingLog.id)
+          .eq("user_id", user.id)
+          .select()
+          .single()
+
+        if (error) {
+          setSaveMessage(error.message)
+          return
+        }
+
+        savedLog = {
+          id: data.id,
+          bookId: data.book_id,
+          date: data.log_date,
+          pagesRead: data.pages_read,
+          endPage: data.end_page,
+          minutesRead: data.minutes_read,
+          notes: data.notes || "",
+          createdAt: data.created_at,
+          updatedAt: data.updated_at,
+        }
+      } else {
+        const { data, error } = await supabase
+          .from("reading_logs")
+          .insert({
+            user_id: user.id,
+            book_id: reviewId,
+            log_date: today,
+            pages_read: pagesRead,
+            end_page: newCurrentPage,
+            minutes_read:
+              minutesReadValue === "" || minutesReadValue === undefined
+                ? null
+                : Number(minutesReadValue || 0),
+            notes: notesValue.trim() || null,
+          })
+          .select()
+          .single()
+
+        if (error) {
+          setSaveMessage(error.message)
+          return
+        }
+
+        savedLog = {
+          id: data.id,
+          bookId: data.book_id,
+          date: data.log_date,
+          pagesRead: data.pages_read,
+          endPage: data.end_page,
+          minutesRead: data.minutes_read,
+          notes: data.notes || "",
+          createdAt: data.created_at,
+          updatedAt: data.updated_at,
+        }
+      }
+
+      const updatedReview = buildUpdatedReadingItem(
+        reviewItem,
+        newCurrentPage,
+        reviewItem.readingLogs || []
+      )
+      const updatedReviews = savedReviews.map((item) =>
+        item.id === reviewId ? updatedReview : item
+      )
+      const saved = await saveReviewsToStorage(updatedReviews, updatedReview, reviewId)
+
+      if (!saved) return
+
+      setReadingLogs((currentLogs) => {
+        const withoutSavedLog = currentLogs.filter((log) => log.id !== savedLog.id)
+        return [savedLog, ...withoutSavedLog]
+      })
+      setProgressInputs({ ...progressInputs, [reviewId]: String(newCurrentPage) })
+      setReadingLogMinutesInputs({ ...readingLogMinutesInputs, [reviewId]: "" })
+      setReadingLogNoteInputs({ ...readingLogNoteInputs, [reviewId]: "" })
+      setSaveMessage(`Logged ${pagesRead} pages for today 🔥`)
+      return
+    }
+
+    let changedReview = null
+
+    const updatedReviews = savedReviews.map((item) => {
+      if (item.id !== reviewId) return item
+
+      const existingLogs = item.readingLogs || []
+      const todayLog = existingLogs.find((log) => log.date === today)
+      let updatedLogs
+
+      if (todayLog) {
+        updatedLogs = existingLogs.map((log) =>
+          log.id === todayLog.id
+            ? {
+                ...log,
+                pagesRead: Number(log.pagesRead || 0) + pagesRead,
+                endPage: newCurrentPage,
+                minutesRead:
+                  minutesReadValue === "" || minutesReadValue === undefined
+                    ? log.minutesRead || null
+                    : Number(log.minutesRead || 0) + Number(minutesReadValue || 0),
+                notes: notesValue.trim()
+                  ? [log.notes, notesValue.trim()].filter(Boolean).join("\n")
+                  : log.notes || "",
+                updatedAt: new Date().toISOString(),
+              }
+            : log
+        )
+      } else {
+        updatedLogs = [
+          ...existingLogs,
+          {
+            id: crypto.randomUUID(),
+            date: today,
+            pagesRead,
+            startPage: startingPage,
+            endPage: newCurrentPage,
+            minutesRead:
+              minutesReadValue === "" || minutesReadValue === undefined
+                ? null
+                : Number(minutesReadValue || 0),
+            notes: notesValue.trim(),
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          },
+        ]
+      }
+
+      const updatedItem = buildUpdatedReadingItem(item, newCurrentPage, updatedLogs)
+      changedReview = updatedItem
+      return updatedItem
+    })
+
+    const saved = await saveReviewsToStorage(updatedReviews, changedReview, reviewId)
+
+    if (saved) {
+      setProgressInputs({ ...progressInputs, [reviewId]: String(newCurrentPage) })
+      setReadingLogMinutesInputs({ ...readingLogMinutesInputs, [reviewId]: "" })
+      setReadingLogNoteInputs({ ...readingLogNoteInputs, [reviewId]: "" })
+      setSaveMessage(`Logged ${pagesRead} pages for today 🔥`)
+    }
+  }
+
+  function buildUpdatedReadingItem(item, newCurrentPage, readingLogs) {
+    const updatedItem = {
+      ...item,
+      bookInfo: {
+        ...item.bookInfo,
+        currentPage: String(newCurrentPage),
+      },
+      readingLogs,
+      updatedAt: new Date().toISOString(),
+    }
+
+    const percent = getProgressPercent(updatedItem.bookInfo)
+    updatedItem.miniReviewText = `📖 Currently Reading
+
+📖 Book:
+${updatedItem.bookInfo.title || "Untitled Book"}
+
+✍️ Author:
+${updatedItem.bookInfo.author || "Unknown Author"}
+
+📍 Progress:
+Page ${updatedItem.bookInfo.currentPage || "0"} of ${updatedItem.bookInfo.totalPages || "?"}
+
+📊 Percent Complete:
+${percent}%`
+
+    return updatedItem
+  }
+
+  function stageReadingLogEdit(reviewId, logId, field, value) {
+    const draftKey = `${reviewId}-${logId}`
+
+    setReadingLogDrafts((currentDrafts) => ({
+      ...currentDrafts,
+      [draftKey]: {
+        ...(currentDrafts[draftKey] || {}),
+        [field]: value,
+      },
+    }))
+
+    setReadingLogDirty((currentDirty) => ({
+      ...currentDirty,
+      [draftKey]: true,
+    }))
+
+    setSaveMessage("You have unsaved reading log edits.")
+  }
+
+  async function saveReadingLogEdits(reviewId, logId) {
+    const draftKey = `${reviewId}-${logId}`
+    const draft = readingLogDrafts[draftKey]
+
+    if (!readingLogDirty[draftKey] || !draft) {
+      setSaveMessage("No reading log edits to save.")
+      return
+    }
+
+    if (user) {
+      const updates = {}
+
+      if (draft.date !== undefined) updates.log_date = draft.date
+      if (draft.pagesRead !== undefined) updates.pages_read = Number(draft.pagesRead || 0)
+      if (draft.endPage !== undefined) updates.end_page = Number(draft.endPage || 0)
+      if (draft.minutesRead !== undefined) {
+        updates.minutes_read = draft.minutesRead === "" ? null : Number(draft.minutesRead || 0)
+      }
+      if (draft.notes !== undefined) updates.notes = draft.notes
+
+      const { data, error } = await supabase
+        .from("reading_logs")
+        .update(updates)
+        .eq("id", logId)
+        .eq("user_id", user.id)
+        .select()
+        .single()
+
+      if (error) {
+        setSaveMessage(error.message)
+        return
+      }
+
+      const savedLog = {
+        id: data.id,
+        bookId: data.book_id,
+        date: data.log_date,
+        pagesRead: data.pages_read,
+        endPage: data.end_page,
+        minutesRead: data.minutes_read,
+        notes: data.notes || "",
+        createdAt: data.created_at,
+        updatedAt: data.updated_at,
+      }
+
+      const nextReadingLogs = readingLogs.map((log) =>
+        log.id === logId ? savedLog : log
+      )
+      setReadingLogs(nextReadingLogs)
+
+      const reviewItem = savedReviews.find((item) => item.id === reviewId)
+      const maxEndPage = Math.max(
+        0,
+        ...nextReadingLogs
+          .filter((log) => log.bookId === reviewId)
+          .map((log) => Number(log.endPage || 0))
+      )
+
+      if (reviewItem && String(maxEndPage) !== String(reviewItem.bookInfo.currentPage || 0)) {
+        const updatedReview = buildUpdatedReadingItem(
+          reviewItem,
+          maxEndPage,
+          reviewItem.readingLogs || []
+        )
+        const updatedReviews = savedReviews.map((item) =>
+          item.id === reviewId ? updatedReview : item
+        )
+        await saveReviewsToStorage(updatedReviews, updatedReview, reviewId)
+        setProgressInputs({ ...progressInputs, [reviewId]: String(maxEndPage) })
+      }
+
+      setReadingLogDrafts((currentDrafts) => {
+        const nextDrafts = { ...currentDrafts }
+        delete nextDrafts[draftKey]
+        return nextDrafts
+      })
+
+      setReadingLogDirty((currentDirty) => {
+        const nextDirty = { ...currentDirty }
+        delete nextDirty[draftKey]
+        return nextDirty
+      })
+
+      setSaveMessage("Reading log edits saved ✅")
+      return
+    }
+
+    let changedReview = null
+
+    const updatedReviews = savedReviews.map((item) => {
+      if (item.id !== reviewId) return item
+
+      const updatedLogs = (item.readingLogs || []).map((log) => {
+        if (log.id !== logId) return log
+
+        return {
+          ...log,
+          ...draft,
+          pagesRead:
+            draft.pagesRead !== undefined
+              ? Number(draft.pagesRead)
+              : Number(log.pagesRead || 0),
+          endPage:
+            draft.endPage !== undefined
+              ? Number(draft.endPage)
+              : Number(log.endPage || 0),
+          minutesRead:
+            draft.minutesRead !== undefined
+              ? draft.minutesRead === ""
+                ? null
+                : Number(draft.minutesRead || 0)
+              : log.minutesRead || null,
+          notes: draft.notes !== undefined ? draft.notes : log.notes || "",
+          updatedAt: new Date().toISOString(),
+        }
+      })
+
+      const maxEndPage = Math.max(
+        0,
+        ...updatedLogs.map((log) => Number(log.endPage || 0))
+      )
+      changedReview = buildUpdatedReadingItem(item, maxEndPage, updatedLogs)
+
+      return changedReview
+    })
+
+    const saved = await saveReviewsToStorage(updatedReviews, changedReview, reviewId)
+    if (saved) {
+      setReadingLogDrafts((currentDrafts) => {
+        const nextDrafts = { ...currentDrafts }
+        delete nextDrafts[draftKey]
+        return nextDrafts
+      })
+
+      setReadingLogDirty((currentDirty) => {
+        const nextDirty = { ...currentDirty }
+        delete nextDirty[draftKey]
+        return nextDirty
+      })
+
+      setSaveMessage("Reading log edits saved ✅")
+    }
+  }
+
+  async function deleteReadingLog(reviewId, logId) {
+    const confirmed = window.confirm("Delete this reading log?")
+    if (!confirmed) return
+
+    if (user) {
+      const { error } = await supabase
+        .from("reading_logs")
+        .delete()
+        .eq("id", logId)
+        .eq("user_id", user.id)
+
+      if (error) {
+        setSaveMessage(error.message)
+        return
+      }
+
+      const nextReadingLogs = readingLogs.filter((log) => log.id !== logId)
+      setReadingLogs(nextReadingLogs)
+
+      const reviewItem = savedReviews.find((item) => item.id === reviewId)
+      const maxEndPage = Math.max(
+        0,
+        ...nextReadingLogs
+          .filter((log) => log.bookId === reviewId)
+          .map((log) => Number(log.endPage || 0))
+      )
+
+      if (reviewItem) {
+        const updatedReview = buildUpdatedReadingItem(
+          reviewItem,
+          maxEndPage,
+          reviewItem.readingLogs || []
+        )
+        const updatedReviews = savedReviews.map((item) =>
+          item.id === reviewId ? updatedReview : item
+        )
+        await saveReviewsToStorage(updatedReviews, updatedReview, reviewId)
+        setProgressInputs({ ...progressInputs, [reviewId]: String(maxEndPage) })
+      }
+
+      const draftKey = `${reviewId}-${logId}`
+      setReadingLogDrafts((currentDrafts) => {
+        const nextDrafts = { ...currentDrafts }
+        delete nextDrafts[draftKey]
+        return nextDrafts
+      })
+      setReadingLogDirty((currentDirty) => {
+        const nextDirty = { ...currentDirty }
+        delete nextDirty[draftKey]
+        return nextDirty
+      })
+      setSaveMessage("Reading log deleted.")
+      return
+    }
+
+    let changedReview = null
+
+    const updatedReviews = savedReviews.map((item) => {
+      if (item.id !== reviewId) return item
+
+      const updatedLogs = (item.readingLogs || []).filter((log) => log.id !== logId)
+      const newCurrentPage = Math.max(
+        0,
+        ...updatedLogs.map((log) => Number(log.endPage || 0))
+      )
+
+      changedReview = buildUpdatedReadingItem(item, newCurrentPage, updatedLogs)
+      return changedReview
+    })
+
+    const saved = await saveReviewsToStorage(updatedReviews, changedReview, reviewId)
+    if (saved) {
+      const draftKey = `${reviewId}-${logId}`
+      setProgressInputs({ ...progressInputs, [reviewId]: String(changedReview?.bookInfo?.currentPage || 0) })
+      setReadingLogDrafts((currentDrafts) => {
+        const nextDrafts = { ...currentDrafts }
+        delete nextDrafts[draftKey]
+        return nextDrafts
+      })
+      setReadingLogDirty((currentDirty) => {
+        const nextDirty = { ...currentDirty }
+        delete nextDirty[draftKey]
+        return nextDirty
+      })
+      setSaveMessage("Reading log deleted.")
+    }
+  }
+
+
+  async function migrateEmbeddedReadingLogsToCloud() {
+    if (!user) {
+      setSaveMessage("Log in before migrating reading logs.")
+      return
+    }
+
+    const embeddedLogsToUpload = savedReviews.flatMap((item) =>
+      (item.readingLogs || []).map((log) => ({
+        id: log.id,
+        user_id: user.id,
+        book_id: item.id,
+        log_date: log.date,
+        pages_read: Number(log.pagesRead || 0),
+        end_page: log.endPage === undefined ? null : Number(log.endPage || 0),
+        minutes_read:
+          log.minutesRead === undefined || log.minutesRead === ""
+            ? null
+            : Number(log.minutesRead || 0),
+        notes: log.notes || null,
+        created_at: log.createdAt || new Date().toISOString(),
+        updated_at: log.updatedAt || new Date().toISOString(),
+      }))
+    )
+
+    if (embeddedLogsToUpload.length === 0) {
+      setSaveMessage("No embedded reading logs found to move.")
+      return
+    }
+
+    const { data, error } = await supabase
+      .from("reading_logs")
+      .upsert(embeddedLogsToUpload)
+      .select()
+
+    if (error) {
+      setSaveMessage(error.message)
+      return
+    }
+
+    const updatedReviews = savedReviews.map((item) => ({
+      ...item,
+      readingLogs: [],
+      updatedAt: new Date().toISOString(),
+    }))
+
+    const reviewRows = updatedReviews.map((item) => ({
+      id: item.id,
+      user_id: user.id,
+      review_data: item,
+      updated_at: new Date().toISOString(),
+    }))
+
+    const { error: reviewError } = await supabase
+      .from("reviews")
+      .upsert(reviewRows)
+
+    if (reviewError) {
+      setSaveMessage(reviewError.message)
+      return
+    }
+
+    const movedLogs = (data || []).map((row) => ({
+      id: row.id,
+      bookId: row.book_id,
+      date: row.log_date,
+      pagesRead: row.pages_read,
+      endPage: row.end_page,
+      minutesRead: row.minutes_read,
+      notes: row.notes || "",
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    }))
+
+    setSavedReviews(updatedReviews)
+    setReadingLogs((currentLogs) => {
+      const movedIds = new Set(movedLogs.map((log) => log.id))
+      return [...movedLogs, ...currentLogs.filter((log) => !movedIds.has(log.id))]
+    })
+    setSaveMessage(`Moved ${embeddedLogsToUpload.length} reading logs to the Supabase reading_logs table ✅`)
   }
 
   async function migrateLocalReviewsToCloud() {
@@ -602,6 +1501,33 @@ ${percent}%`
     await loadCloudReviews(user)
   }
 
+  async function loadCloudReadingLogs(currentUser) {
+    const { data, error } = await supabase
+      .from("reading_logs")
+      .select("*")
+      .eq("user_id", currentUser.id)
+      .order("log_date", { ascending: false })
+
+    if (error) {
+      setSaveMessage(error.message)
+      return
+    }
+
+    const cloudReadingLogs = (data || []).map((row) => ({
+      id: row.id,
+      bookId: row.book_id,
+      date: row.log_date,
+      pagesRead: row.pages_read,
+      endPage: row.end_page,
+      minutesRead: row.minutes_read,
+      notes: row.notes || "",
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    }))
+
+    setReadingLogs(cloudReadingLogs)
+  }
+
   async function loadCloudReviews(currentUser) {
     const { data, error } = await supabase
       .from("reviews")
@@ -631,9 +1557,11 @@ ${percent}%`
 
     if (user) {
       await loadCloudReviews(user)
+      await loadCloudReadingLogs(user)
     } else {
       const saved = localStorage.getItem("brainChemistryBooksReviews")
       setSavedReviews(saved ? JSON.parse(saved) : [])
+      setReadingLogs([])
     }
   }
 
@@ -648,9 +1576,11 @@ ${percent}%`
 
       if (currentUser) {
         loadCloudReviews(currentUser)
+        loadCloudReadingLogs(currentUser)
       } else {
         const saved = localStorage.getItem("brainChemistryBooksReviews")
         setSavedReviews(saved ? JSON.parse(saved) : [])
+        setReadingLogs([])
       }
     })
 
@@ -675,6 +1605,15 @@ ${percent}%`
             </div>
           )}
 
+          {user && embeddedReadingLogCount > 0 && (
+            <div className="score-card">
+              <p>Found {embeddedReadingLogCount} reading log{embeddedReadingLogCount === 1 ? "" : "s"} saved inside book records.</p>
+              <button onClick={migrateEmbeddedReadingLogsToCloud}>
+                Move Reading Logs to Supabase Table
+              </button>
+            </div>
+          )}
+
           <p>Brain Chemistry Books</p>
           <h1>Reading scrapbook meets data analysis.</h1>
           <p>
@@ -685,30 +1624,14 @@ ${percent}%`
           <button onClick={startNewReview}>Start New Review</button>
           <button onClick={() => setStep("currentlyReading")}>Currently Reading</button>
           <button onClick={() => setStep("library")}>View Library</button>
+          <button onClick={() => setStep("analytics")}>Reading Analytics</button>
 
           {savedReviews.length > 0 && (
             <div className="score-card">
-              <p>Reading Stats</p>
-              <p>📚 Books Saved: {totalBooks}</p>
-              <p>✅ Finished Reviews: {finishedReviews.length}</p>
+              <p>Quick Stats</p>
+              <p>🔥 Current Reading Streak: {readingStreakStats.currentStreak} days</p>
               <p>📖 Currently Reading: {currentlyReadingReviews.length}</p>
-              <p>🚫 DNFs: {dnfReviews.length}</p>
-              <p>⭐ Average Rating: {averageRating}/5</p>
-              <p>🌶️ Average Spice: {averageSpice}/5</p>
-              <p>❤️ Average Obsession: {averageObsession}/5</p>
-              <p>🧠 Brain Chemistry Books: {brainChemistryCount}</p>
-
-              {mostReadTrope && (
-                <p>
-                  ❤️ Most Read Trope: {mostReadTrope[0]} ({mostReadTrope[1]})
-                </p>
-              )}
-
-              {mostReadAuthor && (
-                <p>
-                  ✍️ Most Read Author: {mostReadAuthor[0]} ({mostReadAuthor[1]})
-                </p>
-              )}
+              <p>🏆 Longest Reading Streak: {readingStreakStats.longestStreak} days</p>
             </div>
           )}
 
@@ -731,11 +1654,104 @@ ${percent}%`
       )}
 
 
+      {step === "analytics" && (
+        <section>
+          <p>Reading Analytics</p>
+          <h1>Your reading data dashboard.</h1>
+          <p>Built from your reading log entries, finished dates, pages, minutes, and notes.</p>
+
+          {saveMessage && <p>{saveMessage}</p>}
+
+          {savedReviews.length > 0 && (
+            <div className="score-card">
+              <p>📚 Library Snapshot</p>
+              <p>Books Saved: {totalBooks}</p>
+              <p>Finished Reviews: {finishedReviews.length}</p>
+              <p>Finished This Year: {yearToDateCount}</p>
+              <p>Currently Reading: {currentlyReadingReviews.length}</p>
+              <p>DNFs: {dnfReviews.length}</p>
+              <p>Brain Chemistry Books: {brainChemistryCount}</p>
+            </div>
+          )}
+
+          {finishedReviews.length > 0 && (
+            <div className="score-card">
+              <p>⭐ Review Averages</p>
+              <p>Average Rating: {averageRating}/5</p>
+              <p>Average Spice: {averageSpice}/5</p>
+              <p>Average Obsession: {averageObsession}/5</p>
+              {mostReadTrope && (
+                <p>Most Read Trope: {mostReadTrope[0]} ({mostReadTrope[1]})</p>
+              )}
+              {mostReadAuthor && (
+                <p>Most Read Author: {mostReadAuthor[0]} ({mostReadAuthor[1]})</p>
+              )}
+            </div>
+          )}
+
+          <div className="score-card">
+            <p>🔥 Reading Activity</p>
+            <p>Current Streak: {readingStreakStats.currentStreak} days</p>
+            <p>Longest Streak: {readingStreakStats.longestStreak} days</p>
+            <p>Reading Days This Month: {readingAnalyticsStats.readingDaysThisMonth}</p>
+            <p>Reading Days This Year: {readingAnalyticsStats.readingDaysThisYear}</p>
+            <p>Total Reading Sessions: {readingAnalyticsStats.totalSessions}</p>
+            {readingStreakStats.lastLoggedDate && (
+              <p>Last Reading Day: {formatDateKey(readingStreakStats.lastLoggedDate)}</p>
+            )}
+          </div>
+
+          <div className="score-card">
+            <p>📄 Pages</p>
+            <p>Pages Read This Month: {readingAnalyticsStats.pagesThisMonth}</p>
+            <p>Pages Read This Year: {readingAnalyticsStats.pagesThisYear}</p>
+            <p>Total Pages Logged: {readingAnalyticsStats.totalPages}</p>
+            <p>Average Pages Per Reading Day: {readingAnalyticsStats.averagePagesPerReadingDay}</p>
+            {readingAnalyticsStats.biggestReadingDay && (
+              <p>
+                Biggest Reading Day: {readingAnalyticsStats.biggestReadingDay.pages} pages on {formatDateKey(readingAnalyticsStats.biggestReadingDay.date)}
+              </p>
+            )}
+          </div>
+
+          <div className="score-card">
+            <p>⏱️ Time</p>
+            <p>Minutes Read This Month: {readingAnalyticsStats.minutesThisMonth}</p>
+            <p>Minutes Read This Year: {readingAnalyticsStats.minutesThisYear}</p>
+            <p>Total Hours Read: {readingAnalyticsStats.totalHours}</p>
+            <p>Average Session Length: {readingAnalyticsStats.averageSessionLength} minutes</p>
+            <p>Estimated Pace: {readingAnalyticsStats.pagesPerHour} pages/hour</p>
+          </div>
+
+          <div className="score-card">
+            <p>✅ Finished Book Stats</p>
+            <p>Books Finished This Month: {readingAnalyticsStats.finishedThisMonth}</p>
+            <p>Average Days to Finish: {readingAnalyticsStats.averageDaysToFinish}</p>
+            {readingAnalyticsStats.fastestRead && (
+              <p>
+                Fastest Read: {readingAnalyticsStats.fastestRead.item.bookInfo.title || "Untitled Book"} • {readingAnalyticsStats.fastestRead.days} day{readingAnalyticsStats.fastestRead.days === 1 ? "" : "s"}
+              </p>
+            )}
+            {readingAnalyticsStats.slowestRead && (
+              <p>
+                Slowest Read: {readingAnalyticsStats.slowestRead.item.bookInfo.title || "Untitled Book"} • {readingAnalyticsStats.slowestRead.days} day{readingAnalyticsStats.slowestRead.days === 1 ? "" : "s"}
+              </p>
+            )}
+          </div>
+
+          <button onClick={() => setStep("home")}>Back Home</button>
+          <button onClick={() => setStep("currentlyReading")}>Currently Reading</button>
+        </section>
+      )}
+
+
       {step === "currentlyReading" && (
         <section>
           <p>Currently Reading</p>
           <h1>Reading Progress</h1>
-          <p>Update your current page and watch the progress bar move.</p>
+          <p>Keep this page simple: log pages here, then open the full log only when you need to edit history.</p>
+
+          {saveMessage && <p>{saveMessage}</p>}
 
           {currentlyReadingReviews.length === 0 && (
             <p>No currently reading books yet.</p>
@@ -743,6 +1759,11 @@ ${percent}%`
 
           {currentlyReadingReviews.map((item) => {
             const progressPercent = getProgressPercent(item.bookInfo)
+            const pageInputValue =
+              progressInputs[item.id] ?? item.bookInfo.currentPage ?? ""
+            const lastLog = [...getBookReadingLogs(item.id)].sort((a, b) =>
+              (b.date || "").localeCompare(a.date || "")
+            )[0]
 
             return (
               <div className="score-card" key={item.id}>
@@ -758,17 +1779,34 @@ ${percent}%`
                 <p>{item.bookInfo.author || "Unknown Author"}</p>
                 <p>{item.bookInfo.format} • Currently Reading</p>
 
+                {item.bookInfo.dateStarted && (
+                  <p>📖 Started {formatDate(item.bookInfo.dateStarted)}</p>
+                )}
+
                 <p>
                   Page {item.bookInfo.currentPage || "0"} of {item.bookInfo.totalPages || "?"}
                 </p>
 
                 <ProgressBar percent={progressPercent} />
 
-                <TextInput
-                  label="Update Current Page"
-                  value={item.bookInfo.currentPage || ""}
-                  onChange={(value) => updateReadingProgress(item.id, value)}
-                />
+                <button
+                  onClick={() => {
+                    setSelectedReadingLogBookId(item.id)
+                    setStep("readingLog")
+                  }}
+                >
+                  🔥 Log Today's Reading
+                </button>
+
+                {lastLog && (
+                  <p>
+                    Last log: {formatDateKey(lastLog.date)} • {lastLog.pagesRead || 0} pages
+                  </p>
+                )}
+
+                <button onClick={() => finishBook(item)}>
+                  ✅ Finish Book
+                </button>
 
                 <button onClick={() => openSavedReview(item)}>View Details</button>
                 <button onClick={() => editReview(item)}>Edit</button>
@@ -780,6 +1818,186 @@ ${percent}%`
           <button onClick={() => setStep("home")}>Back Home</button>
         </section>
       )}
+
+      {step === "readingLog" && (() => {
+        const item = savedReviews.find((reviewItem) => reviewItem.id === selectedReadingLogBookId)
+
+        if (!item) {
+          return (
+            <section>
+              <p>Reading Log</p>
+              <h1>No book selected</h1>
+              <p>Go back to Currently Reading and choose a book log to manage.</p>
+              <button onClick={() => setStep("currentlyReading")}>Back to Currently Reading</button>
+            </section>
+          )
+        }
+
+        const progressPercent = getProgressPercent(item.bookInfo)
+        const pageInputValue =
+          progressInputs[item.id] ?? item.bookInfo.currentPage ?? ""
+        const readingLogs = [...getBookReadingLogs(item.id)].sort((a, b) =>
+          (b.date || "").localeCompare(a.date || "")
+        )
+
+        return (
+          <section>
+            <p>Reading Log</p>
+            <h1>{item.bookInfo.title || "Untitled Book"}</h1>
+            <p>{item.bookInfo.author || "Unknown Author"}</p>
+
+            {saveMessage && <p>{saveMessage}</p>}
+
+            {item.bookInfo.coverUrl && (
+              <img
+                src={item.bookInfo.coverUrl}
+                alt="Book cover"
+                className="book-cover"
+              />
+            )}
+
+            <div className="score-card">
+              <p>Current Progress</p>
+              <p>Page {item.bookInfo.currentPage || "0"} of {item.bookInfo.totalPages || "?"}</p>
+              <ProgressBar percent={progressPercent} />
+
+              <div className="review-field">
+                <label>Page I reached today</label>
+                <input
+                  type="number"
+                  min="0"
+                  max={item.bookInfo.totalPages || undefined}
+                  value={pageInputValue}
+                  onChange={(event) =>
+                    setProgressInputs({
+                      ...progressInputs,
+                      [item.id]: event.target.value,
+                    })
+                  }
+                />
+              </div>
+
+              <div className="review-field">
+                <label>Minutes Read (optional)</label>
+                <input
+                  type="number"
+                  min="0"
+                  value={readingLogMinutesInputs[item.id] || ""}
+                  onChange={(event) =>
+                    setReadingLogMinutesInputs({
+                      ...readingLogMinutesInputs,
+                      [item.id]: event.target.value,
+                    })
+                  }
+                />
+              </div>
+
+              <div className="review-field">
+                <label>Reading Notes (optional)</label>
+                <textarea
+                  value={readingLogNoteInputs[item.id] || ""}
+                  onChange={(event) =>
+                    setReadingLogNoteInputs({
+                      ...readingLogNoteInputs,
+                      [item.id]: event.target.value,
+                    })
+                  }
+                  placeholder="Optional: where you read, thoughts, chaos, etc."
+                />
+              </div>
+
+              <button onClick={() => logReadingProgress(item.id)}>
+                🔥 Log Reading
+              </button>
+            </div>
+
+            <div className="score-card">
+              <p>Reading Log History</p>
+              <p>Editing a log updates your streak stats. Delete accidental logs here.</p>
+
+              {readingLogs.length === 0 && (
+                <p>No page logs yet. Your streak starts once you log 2 days in a row.</p>
+              )}
+
+              {readingLogs.map((log) => {
+                const draftKey = `${item.id}-${log.id}`
+                const draft = readingLogDrafts[draftKey] || {}
+                const hasUnsavedEdits = Boolean(readingLogDirty[draftKey])
+
+                return (
+                  <div className="review-field" key={log.id}>
+                    <label>Log Date</label>
+                    <input
+                      type="date"
+                      value={draft.date ?? log.date ?? ""}
+                      onChange={(event) =>
+                        stageReadingLogEdit(item.id, log.id, "date", event.target.value)
+                      }
+                    />
+
+                    <label>Pages Read</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={draft.pagesRead ?? log.pagesRead ?? 0}
+                      onChange={(event) =>
+                        stageReadingLogEdit(item.id, log.id, "pagesRead", event.target.value)
+                      }
+                    />
+
+                    <label>Ended On Page</label>
+                    <input
+                      type="number"
+                      min="0"
+                      max={item.bookInfo.totalPages || undefined}
+                      value={draft.endPage ?? log.endPage ?? 0}
+                      onChange={(event) =>
+                        stageReadingLogEdit(item.id, log.id, "endPage", event.target.value)
+                      }
+                    />
+
+                    <label>Minutes Read</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={draft.minutesRead ?? log.minutesRead ?? ""}
+                      onChange={(event) =>
+                        stageReadingLogEdit(item.id, log.id, "minutesRead", event.target.value)
+                      }
+                    />
+
+                    <label>Notes</label>
+                    <textarea
+                      value={draft.notes ?? log.notes ?? ""}
+                      onChange={(event) =>
+                        stageReadingLogEdit(item.id, log.id, "notes", event.target.value)
+                      }
+                    />
+
+                    <p>
+                      {formatDateKey(draft.date ?? log.date)} • {draft.pagesRead ?? log.pagesRead ?? 0} pages
+                      {(draft.minutesRead ?? log.minutesRead) ? ` • ${draft.minutesRead ?? log.minutesRead} minutes` : ""}
+                    </p>
+
+                    {hasUnsavedEdits && (
+                      <button onClick={() => saveReadingLogEdits(item.id, log.id)}>
+                        Save Edits
+                      </button>
+                    )}
+
+                    <button onClick={() => deleteReadingLog(item.id, log.id)}>
+                      Delete Log
+                    </button>
+                  </div>
+                )
+              })}
+            </div>
+
+            <button onClick={() => setStep("currentlyReading")}>Back to Currently Reading</button>
+            <button onClick={() => setStep("home")}>Back Home</button>
+          </section>
+        )
+      })()}
 
       {step === "library" && (
         <section>
@@ -827,10 +2045,17 @@ ${percent}%`
                   <h2>{item.bookInfo.title || "Untitled Book"}</h2>
                   <p>{item.bookInfo.author || "Unknown Author"}</p>
                   <p>{item.bookInfo.format} • Reading</p>
+                  {item.bookInfo.dateStarted && (
+                    <p>📖 Started {formatDate(item.bookInfo.dateStarted)}</p>
+                  )}
                   <p>
                     Page {item.bookInfo.currentPage || "0"} of {item.bookInfo.totalPages || "?"}
                   </p>
                   <ProgressBar percent={getProgressPercent(item.bookInfo)} />
+
+                  <button onClick={() => finishBook(item)}>
+                    ✅ Finish Book
+                  </button>
                 </>
               ) : (
                 <>
@@ -839,6 +2064,15 @@ ${percent}%`
                   <h2>{item.bookInfo.title || "Untitled Book"}</h2>
                   <p>{item.bookInfo.author || "Unknown Author"}</p>
                   <p>{item.bookInfo.format} • {item.bookInfo.status}</p>
+                  {item.bookInfo.dateFinished && (
+                    <p>📅 Finished {formatDate(item.bookInfo.dateFinished)}</p>
+                  )}
+                  {getDaysToRead(item) && (
+                    <p>
+                      ⏱️ Read in {getDaysToRead(item)} day
+                      {getDaysToRead(item) !== 1 ? "s" : ""}
+                    </p>
+                  )}
                   <p>
                     ⭐ {item.bookScore}/5 • ❤️ {item.obsessionScore}/5 • 🌶️{" "}
                     {item.metrics?.spice}/5
@@ -848,7 +2082,7 @@ ${percent}%`
               )}
 
               <button onClick={() => openSavedReview(item)}>View Review</button>
-              <button onClick={() => editReview(item)}>Edit</button>
+              <button onClick={() => editReview(item)}>Edit Review / Dates</button>
               <button onClick={() => deleteReview(item.id)}>Delete</button>
             </div>
           ))}
@@ -908,6 +2142,10 @@ ${percent}%`
               <p>{selectedReview.bookInfo.author || "Unknown Author"}</p>
               <p>{selectedReview.bookInfo.format} • Reading</p>
 
+              {selectedReview.bookInfo.dateStarted && (
+                <p>📖 Started {formatDate(selectedReview.bookInfo.dateStarted)}</p>
+              )}
+
               <div className="score-card">
                 <p>Reading Progress</p>
                 <h2>{getProgressPercent(selectedReview.bookInfo)}%</h2>
@@ -915,6 +2153,10 @@ ${percent}%`
                   Page {selectedReview.bookInfo.currentPage || "0"} of {selectedReview.bookInfo.totalPages || "?"}
                 </p>
                 <ProgressBar percent={getProgressPercent(selectedReview.bookInfo)} />
+
+                <button onClick={() => finishBook(selectedReview)}>
+                  ✅ Finish Book
+                </button>
               </div>
 
               <div className="score-card">
@@ -931,6 +2173,21 @@ ${percent}%`
               <p>
                 {selectedReview.bookInfo.format} • {selectedReview.bookInfo.status}
               </p>
+
+              {selectedReview.bookInfo.dateStarted && (
+                <p>📖 Started {formatDate(selectedReview.bookInfo.dateStarted)}</p>
+              )}
+
+              {selectedReview.bookInfo.dateFinished && (
+                <p>📅 Finished {formatDate(selectedReview.bookInfo.dateFinished)}</p>
+              )}
+
+              {getDaysToRead(selectedReview) && (
+                <p>
+                  ⏱️ Read in {getDaysToRead(selectedReview)} day
+                  {getDaysToRead(selectedReview) !== 1 ? "s" : ""}
+                </p>
+              )}
 
               <div className="score-card">
                 <p>On Paper Score</p>
@@ -1004,7 +2261,7 @@ ${percent}%`
           )}
 
           <button onClick={() => setStep("library")}>Back to Library</button>
-          <button onClick={() => editReview(selectedReview)}>Edit Review</button>
+          <button onClick={() => editReview(selectedReview)}>Edit Review / Dates</button>
           <button onClick={() => deleteReview(selectedReview.id)}>
             Delete Review
           </button>
@@ -1030,6 +2287,16 @@ ${percent}%`
           <TextInput label="Book Number" value={bookInfo.bookNumber} onChange={(value) => updateBookInfo("bookNumber", value)} />
           <TextInput label="Genre" value={bookInfo.genre} onChange={(value) => updateBookInfo("genre", value)} />
           <TextInput label="Total Pages" value={bookInfo.totalPages} onChange={(value) => updateBookInfo("totalPages", value)} />
+          <div className="score-card">
+            <p>Reading Dates</p>
+            <p>
+              These can be edited manually, but the app will also fill them in
+              automatically when you start or finish a book.
+            </p>
+
+            <DateInput label="Date Started" value={bookInfo.dateStarted} onChange={(value) => updateBookInfo("dateStarted", value)} />
+            <DateInput label="Date Finished" value={bookInfo.dateFinished} onChange={(value) => updateBookInfo("dateFinished", value)} />
+          </div>
 
           {bookInfo.status === "Reading" && (
             <TextInput
@@ -1293,7 +2560,7 @@ ${percent}%`
           <input
             type="range"
             min="1"
-            max="15"
+            max="5"
             step="1"
             value={obsessionScore}
             onChange={(e) => setObsessionScore(Number(e.target.value))}
@@ -1401,6 +2668,27 @@ function ProgressBar({ percent }) {
     <div className="progress-bar">
       <div className="progress-fill" style={{ width: `${percent}%` }}></div>
       <span>{percent}%</span>
+    </div>
+  )
+}
+
+function DateInput({ label, value, onChange }) {
+  const dateValue = value ? value.slice(0, 10) : ""
+
+  return (
+    <div className="review-field">
+      <label>{label}</label>
+      <input
+        type="date"
+        value={dateValue}
+        onChange={(e) => {
+          const newValue = e.target.value
+            ? new Date(`${e.target.value}T12:00:00`).toISOString()
+            : ""
+
+          onChange(newValue)
+        }}
+      />
     </div>
   )
 }
