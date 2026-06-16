@@ -1,8 +1,47 @@
+/* Pressed Pages Theme
+   Read • Rate • Romanticize
+   Cozy scrapbook / pressed-flower reading journal styling
+*/
+
+:root {
+  --paper-cream: #F7F1E8;
+  --soft-linen: #FFFDFC;
+  --warm-parchment: #EFE3D4;
+  --pressed-rose: #D9B8B0;
+  --dusty-mauve: #B89AA6;
+  --dried-sage: #A8B29A;
+  --vintage-cocoa: #7A5D50;
+  --deep-cocoa: #4F3B33;
+  --ink-brown: #3E2F2A;
+  --aged-gold: #C8A96A;
+  --soft-shadow: rgba(79, 59, 51, 0.14);
+  --paper-border: rgba(122, 93, 80, 0.28);
+}
+
+* {
+  box-sizing: border-box;
+}
+
 body {
   margin: 0;
-  background: #1f1714;
-  color: #f3e8dc;
-  font-family: Georgia, serif;
+  background:
+    radial-gradient(circle at 12% 12%, rgba(217, 184, 176, 0.26), transparent 28%),
+    radial-gradient(circle at 88% 8%, rgba(168, 178, 154, 0.22), transparent 24%),
+    linear-gradient(135deg, var(--paper-cream), #F2E7DA 48%, #F9F3EC);
+  color: var(--ink-brown);
+  font-family: Georgia, "Times New Roman", serif;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.35;
+  background-image:
+    linear-gradient(rgba(122, 93, 80, 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(122, 93, 80, 0.035) 1px, transparent 1px);
+  background-size: 34px 34px;
 }
 
 main {
@@ -13,41 +52,94 @@ main {
 }
 
 section {
-  max-width: 650px;
-  background: #2f2420;
-  border: 1px solid #a65434;
-  border-radius: 24px;
+  width: min(100%, 760px);
+  max-width: 760px;
+  position: relative;
+  background:
+    linear-gradient(180deg, rgba(255, 253, 252, 0.96), rgba(247, 241, 232, 0.96));
+  border: 1px solid var(--paper-border);
+  border-radius: 28px;
   padding: 36px;
+  box-shadow: 0 18px 45px var(--soft-shadow);
+}
+
+section::before {
+  content: "";
+  position: absolute;
+  top: -12px;
+  left: 50%;
+  width: 130px;
+  height: 28px;
+  transform: translateX(-50%) rotate(-1.5deg);
+  background: rgba(217, 184, 176, 0.62);
+  border: 1px solid rgba(122, 93, 80, 0.15);
+  border-radius: 6px;
+  box-shadow: 0 4px 10px rgba(79, 59, 51, 0.08);
 }
 
 p {
-  color: #d9c5b4;
-  line-height: 1.6;
+  color: var(--vintage-cocoa);
+  line-height: 1.65;
 }
 
 h1 {
-  font-size: 44px;
-  line-height: 1;
+  margin-top: 0;
+  font-size: clamp(38px, 7vw, 58px);
+  line-height: 0.95;
+  color: var(--deep-cocoa);
+  letter-spacing: -0.03em;
+}
+
+h2,
+h3 {
+  color: var(--deep-cocoa);
 }
 
 button {
-  background: #a65434;
-  color: #fff7ef;
-  border: none;
+  background: var(--pressed-rose);
+  color: var(--deep-cocoa);
+  border: 1px solid rgba(122, 93, 80, 0.22);
   border-radius: 999px;
-  padding: 14px 22px;
+  padding: 13px 20px;
+  margin-top: 16px;
   margin-right: 12px;
   cursor: pointer;
   font-weight: bold;
+  font-family: Georgia, "Times New Roman", serif;
+  box-shadow: 0 8px 18px rgba(122, 93, 80, 0.12);
+  transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
 }
+
+button:hover {
+  transform: translateY(-1px);
+  background: #E4C4BC;
+  box-shadow: 0 10px 24px rgba(122, 93, 80, 0.16);
+}
+
+button:active {
+  transform: translateY(0);
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+  transform: none;
+  box-shadow: none;
+}
+
 .slider-row {
   margin: 24px 0;
+  padding: 18px;
+  background: rgba(255, 253, 252, 0.72);
+  border: 1px dashed rgba(122, 93, 80, 0.28);
+  border-radius: 18px;
 }
 
 .slider-label {
   display: flex;
   justify-content: space-between;
   margin-bottom: 8px;
+  color: var(--deep-cocoa);
 }
 
 .slider-label span {
@@ -55,80 +147,81 @@ button {
 }
 
 .slider-label strong {
-  color: #e8a66b;
+  color: #9A6A59;
 }
 
 input[type="range"] {
   width: 100%;
+  accent-color: var(--dusty-mauve);
 }
 
 .score-card {
   margin-top: 32px;
-  padding: 24px;
-  background: #1f1714;
-  border: 1px solid #7a8c6a;
-  border-radius: 18px;
+  padding: 26px;
+  background:
+    linear-gradient(180deg, rgba(247, 241, 232, 0.92), rgba(255, 253, 252, 0.92));
+  border: 1px solid rgba(168, 178, 154, 0.65);
+  border-radius: 22px;
   text-align: center;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.55);
 }
 
 .score-card h2 {
-  font-size: 40px;
+  font-size: 42px;
   margin: 0;
+  color: var(--deep-cocoa);
 }
+
 .slider-question {
   margin-top: 4px;
   margin-bottom: 12px;
-  color: #d9c5b4;
+  color: var(--vintage-cocoa);
   font-style: italic;
 }
+
 label {
   display: block;
   margin-top: 20px;
   margin-bottom: 12px;
   font-weight: bold;
+  color: var(--deep-cocoa);
 }
 
-textarea {
-  display: block;
-  width: 100%;
-  min-height: 90px;
-  margin-top: 8px;
-
-  background: #1f1714;
-  color: #f3e8dc;
-
-  border: 1px solid #7a5b4d;
-  border-radius: 12px;
-
-  padding: 12px;
-  box-sizing: border-box;
-
-  resize: vertical;
-}
-
-button {
-  margin-top: 16px;
-}
+textarea,
 input,
 select {
   display: block;
   width: 100%;
   margin-top: 8px;
-  padding: 12px;
+  padding: 13px 14px;
   box-sizing: border-box;
-
-  background: #1f1714;
-  color: #f3e8dc;
-
-  border: 1px solid #7a5b4d;
-  border-radius: 12px;
+  background: var(--soft-linen);
+  color: var(--ink-brown);
+  border: 1px solid rgba(122, 93, 80, 0.32);
+  border-radius: 14px;
+  font-family: Georgia, "Times New Roman", serif;
+  box-shadow: inset 0 1px 3px rgba(122, 93, 80, 0.08);
 }
+
+textarea {
+  min-height: 96px;
+  resize: vertical;
+}
+
+textarea:focus,
+input:focus,
+select:focus {
+  outline: 3px solid rgba(217, 184, 176, 0.38);
+  border-color: var(--dusty-mauve);
+}
+
 pre {
   white-space: pre-wrap;
-  font-family: Georgia, serif;
-  color: #f3e8dc;
+  font-family: Georgia, "Times New Roman", serif;
+  color: var(--ink-brown);
   line-height: 1.6;
 }
+
 .trope-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -140,46 +233,57 @@ pre {
   align-items: center;
   gap: 8px;
   margin: 0;
-  padding: 10px;
-
-  background: #1f1714;
-  border: 1px solid #7a5b4d;
-  border-radius: 12px;
-
+  padding: 11px 12px;
+  background: rgba(255, 253, 252, 0.78);
+  border: 1px solid rgba(122, 93, 80, 0.24);
+  border-radius: 14px;
   font-weight: normal;
+  color: var(--ink-brown);
+}
+
+.trope-option:hover {
+  background: rgba(217, 184, 176, 0.16);
 }
 
 .trope-option input {
   width: auto;
   margin: 0;
+  accent-color: var(--dusty-mauve);
 }
+
 .book-cover {
   width: 140px;
-  border-radius: 12px;
+  border-radius: 14px;
   margin: 0 auto 16px auto;
   display: block;
+  box-shadow: 0 12px 26px rgba(79, 59, 51, 0.22);
+  border: 8px solid var(--soft-linen);
 }
 
 .review-graphic {
   width: 100%;
   max-width: 450px;
-  border-radius: 16px;
+  border-radius: 18px;
   display: block;
+  box-shadow: 0 14px 32px rgba(79, 59, 51, 0.18);
+  border: 1px solid rgba(122, 93, 80, 0.18);
 }
+
 .progress-bar {
   width: 100%;
-  background: #1f1714;
-  border: 1px solid #7a5b4d;
+  background: rgba(239, 227, 212, 0.9);
+  border: 1px solid rgba(122, 93, 80, 0.24);
   border-radius: 999px;
   overflow: hidden;
   margin: 16px 0;
   position: relative;
-  height: 28px;
+  height: 30px;
+  box-shadow: inset 0 1px 4px rgba(122, 93, 80, 0.12);
 }
 
 .progress-fill {
   height: 100%;
-  background: #a65434;
+  background: linear-gradient(90deg, var(--dried-sage), var(--pressed-rose));
   transition: width 0.3s ease;
 }
 
@@ -189,5 +293,68 @@ pre {
   display: grid;
   place-items: center;
   font-weight: bold;
-  color: #f3e8dc;
+  color: var(--deep-cocoa);
+  text-shadow: 0 1px 0 rgba(255, 253, 252, 0.65);
+}
+
+@media (max-width: 640px) {
+  main {
+    padding: 14px;
+  }
+
+  section {
+    padding: 26px 20px;
+    border-radius: 22px;
+  }
+
+  .trope-grid {
+    grid-template-columns: 1fr;
+  }
+
+  button {
+    width: 100%;
+    margin-right: 0;
+  }
+}
+
+/* Phase 6C restored layout helpers */
+.button-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  margin-top: 16px;
+}
+
+.button-row button {
+  margin-top: 0;
+}
+
+.secondary-button {
+  background: rgba(255, 253, 252, 0.88);
+  color: var(--deep-cocoa);
+  border: 1px solid rgba(122, 93, 80, 0.28);
+}
+
+.secondary-button:hover {
+  background: rgba(239, 227, 212, 0.95);
+}
+
+.review-field {
+  margin: 14px 0;
+  padding: 14px 16px;
+  background: rgba(255, 253, 252, 0.68);
+  border: 1px solid rgba(122, 93, 80, 0.18);
+  border-radius: 16px;
+}
+
+.review-field strong {
+  color: var(--deep-cocoa);
+}
+
+@media (min-width: 900px) {
+  section {
+    width: min(100%, 900px);
+    max-width: 900px;
+  }
 }

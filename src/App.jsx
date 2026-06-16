@@ -112,6 +112,18 @@ function App() {
         }
   })
 
+  const [reviewGraphicTemplate, setReviewGraphicTemplate] = useState("scrapbook")
+  const [reviewGraphicSize, setReviewGraphicSize] = useState("square")
+  const [reviewCaptionPlatform, setReviewCaptionPlatform] = useState("instagram")
+  const [reviewGraphicFields, setReviewGraphicFields] = useState({
+    rating: true,
+    spice: true,
+    obsession: true,
+    review: true,
+    vibe: true,
+    tropes: true,
+  })
+
   const filteredReviews = savedReviews.filter((item) => {
     if (libraryFilter === "favorites") return item.isFavorite
     if (libraryFilter === "reading") return item.bookInfo.status === "Reading"
@@ -668,189 +680,242 @@ ${review.vibeCheck}`
       .replace(/^-+|-+$/g, "") || "review-graphic"
   }
 
-  function buildReviewGraphicSvg(reviewItem) {
+  function getReviewGraphicOptions() {
+    return {
+      template: reviewGraphicTemplate,
+      size: reviewGraphicSize,
+      fields: reviewGraphicFields,
+    }
+  }
+
+  function toggleReviewGraphicField(fieldName) {
+    setReviewGraphicFields((prev) => ({
+      ...prev,
+      [fieldName]: !prev[fieldName],
+    }))
+  }
+
+  function getReviewGraphicDimensions(size = "square") {
+    if (size === "story") return { width: 1080, height: 1920 }
+    if (size === "pinterest") return { width: 1000, height: 1500 }
+    return { width: 1080, height: 1080 }
+  }
+
+  function getReviewGraphicFacts(reviewItem) {
+    const title = reviewItem?.bookInfo?.title || "Untitled Book"
+    const author = reviewItem?.bookInfo?.author || "Unknown Author"
+    const coverUrl = reviewItem?.bookInfo?.coverUrl || ""
+    const rating = reviewItem?.bookScore || "0"
+    const spice = reviewItem?.metrics?.spice ?? "0"
+    const obsession = reviewItem?.obsessionScore ?? "0"
+    const quote =
+      reviewItem?.review?.oneSentenceReview ||
+      reviewItem?.review?.favoriteThing ||
+      "No review text yet."
+    const vibe = reviewItem?.review?.vibeCheck || "No vibe check added yet."
+    const tropeList = (reviewItem?.tropes || []).slice(0, 6)
+
+    return { title, author, coverUrl, rating, spice, obsession, quote, vibe, tropeList }
+  }
+
+  function buildReviewGraphicSvg(reviewItem, options = {}) {
     if (!reviewItem) return ""
 
-    const title = reviewItem.bookInfo?.title || "Untitled Book"
-    const author = reviewItem.bookInfo?.author || "Unknown Author"
-    const coverUrl = reviewItem.bookInfo?.coverUrl || ""
-    const rating = reviewItem.bookScore || "0"
-    const spice = reviewItem.metrics?.spice ?? "0"
-    const obsession = reviewItem.obsessionScore ?? "0"
-    const quote =
-      reviewItem.review?.oneSentenceReview ||
-      reviewItem.review?.favoriteThing ||
-      "No review text yet."
-    const vibe = reviewItem.review?.vibeCheck || "No vibe check added yet."
-    const tropeList = (reviewItem.tropes || []).slice(0, 6)
-    const titleLines = getWrappedSvgLines(title, 18, 2)
-    const quoteLines = getWrappedSvgLines(quote, 34, 3)
-    const vibeLines = getWrappedSvgLines(vibe, 24, 3)
+    const facts = getReviewGraphicFacts(reviewItem)
+    const template = options.template || "scrapbook"
+    const fields = {
+      rating: true,
+      spice: true,
+      obsession: true,
+      review: true,
+      vibe: true,
+      tropes: true,
+      ...(options.fields || {}),
+    }
+    const { width, height } = getReviewGraphicDimensions(options.size || "square")
+    const isTall = height > width
+    const topShift = isTall ? 220 : 0
+    const bottomY = isTall ? height - 435 : 824
+    const footerY = height - 50
+    const coverX = 90
+    const coverY = 262 + topShift
+    const coverW = 280
+    const coverH = 390
+
+    const themes = {
+      scrapbook: {
+        bg: "#221A16",
+        paper: "#F5EBDD",
+        accent: "#B56B6B",
+        gold: "#C29A5A",
+        ink: "#2F2420",
+        label: "#8A4F2A",
+        card: "#F1E4D2",
+        footer: "#2F2420",
+        footerText: "#F3E9DD",
+        lines: 0.72,
+      },
+      minimal: {
+        bg: "#F8F4EE",
+        paper: "#FFFFFF",
+        accent: "#A49484",
+        gold: "#D8C7B1",
+        ink: "#2F2420",
+        label: "#4B3A32",
+        card: "#F5EFE8",
+        footer: "#E6DED4",
+        footerText: "#4B3A32",
+        lines: 0.24,
+      },
+      dark: {
+        bg: "#100C0A",
+        paper: "#211915",
+        accent: "#B56B6B",
+        gold: "#C29A5A",
+        ink: "#F3E9DD",
+        label: "#C29A5A",
+        card: "#2F2420",
+        footer: "#C29A5A",
+        footerText: "#100C0A",
+        lines: 0.22,
+      },
+      soft: {
+        bg: "#F2DCDC",
+        paper: "#FFF7EF",
+        accent: "#B56B6B",
+        gold: "#E8C6B5",
+        ink: "#4B3A32",
+        label: "#A6546D",
+        card: "#FFEDED",
+        footer: "#B56B6B",
+        footerText: "#FFF7EF",
+        lines: 0.48,
+      },
+    }
+    const theme = themes[template] || themes.scrapbook
+
+    const titleLines = getWrappedSvgLines(facts.title, 18, 2)
+    const quoteLines = getWrappedSvgLines(facts.quote, 32, 3)
+    const vibeLines = getWrappedSvgLines(facts.vibe, 28, 3)
+    const tropeText = facts.tropeList.length ? facts.tropeList.join(" • ") : "No tropes selected."
+    const tropeLines = getWrappedSvgLines(tropeText, 30, 3)
 
     const titleSvg = titleLines
-      .map(
-        (line, index) =>
-          `<text x="540" y="${178 + index * 54}" class="title" text-anchor="middle">${escapeSvgText(line)}</text>`
-      )
+      .map((line, index) => `<text x="${width / 2}" y="${150 + topShift + index * 52}" class="title" text-anchor="middle">${escapeSvgText(line)}</text>`)
       .join("")
 
     const quoteSvg = quoteLines
-      .map(
-        (line, index) =>
-          `<text x="686" y="${688 + index * 42}" class="handText" text-anchor="middle">${escapeSvgText(line)}</text>`
-      )
+      .map((line, index) => `<text x="710" y="${650 + topShift + index * 39}" class="handText" text-anchor="middle">${escapeSvgText(line)}</text>`)
       .join("")
 
     const vibeSvg = vibeLines
-      .map(
-        (line, index) =>
-          `<text x="540" y="${890 + index * 30}" class="smallText" text-anchor="middle">${escapeSvgText(line)}</text>`
-      )
+      .map((line, index) => `<text x="${width * 0.36}" y="${bottomY + 80 + index * 30}" class="smallText" text-anchor="middle">${escapeSvgText(line)}</text>`)
       .join("")
 
-    const tropeText = tropeList.length ? tropeList.join(" • ") : "No tropes selected."
-    const tropeLines = getWrappedSvgLines(tropeText, 26, 3)
     const tropeSvg = tropeLines
-      .map(
-        (line, index) =>
-          `<text x="820" y="${890 + index * 30}" class="smallText" text-anchor="middle">${escapeSvgText(line)}</text>`
-      )
+      .map((line, index) => `<text x="${width * 0.72}" y="${bottomY + 80 + index * 30}" class="smallText" text-anchor="middle">${escapeSvgText(line)}</text>`)
       .join("")
 
-    const coverSvg = coverUrl
-      ? `<image href="${escapeSvgText(coverUrl)}" x="96" y="276" width="258" height="350" preserveAspectRatio="xMidYMid slice" clip-path="url(#coverClip)" />`
-      : `<rect x="96" y="276" width="258" height="350" rx="8" class="coverPlaceholder" />
-         <text x="225" y="440" class="placeholderText" text-anchor="middle">No Cover</text>
-         <text x="225" y="484" class="doodle" text-anchor="middle">♡</text>`
+    const coverSvg = facts.coverUrl
+      ? `<image href="${escapeSvgText(facts.coverUrl)}" x="${coverX + 18}" y="${coverY + 32}" width="${coverW - 36}" height="${coverH - 80}" preserveAspectRatio="xMidYMid slice" clip-path="url(#coverClip)" />`
+      : `<rect x="${coverX + 18}" y="${coverY + 32}" width="${coverW - 36}" height="${coverH - 80}" rx="10" class="coverPlaceholder" />
+         <text x="${coverX + coverW / 2}" y="${coverY + 190}" class="placeholderText" text-anchor="middle">No Cover</text>`
 
-    return `<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1080" viewBox="0 0 1080 1080">
+    const statItems = []
+    if (fields.rating) statItems.push({ label: "RATING", icon: "⭐", value: `${facts.rating}/5` })
+    if (fields.spice) statItems.push({ label: "SPICE", icon: "🌶️", value: `${facts.spice}/5` })
+    if (fields.obsession) statItems.push({ label: "OBSESSION", icon: "🔥", value: `${facts.obsession}/5` })
+
+    const statStartX = statItems.length === 1 ? 650 : statItems.length === 2 ? 560 : 450
+    const statGap = statItems.length === 2 ? 210 : 180
+    const statSvg = statItems.map((stat, index) => {
+      const x = statStartX + index * statGap
+      const y = 372 + topShift
+      return `<g>
+        <rect x="${x - 72}" y="${y - 52}" width="144" height="172" rx="18" class="statCard" />
+        <text x="${x}" y="${y - 14}" class="label" text-anchor="middle">${escapeSvgText(stat.label)}</text>
+        <text x="${x}" y="${y + 46}" class="statText" text-anchor="middle">${escapeSvgText(stat.icon)}</text>
+        <text x="${x}" y="${y + 98}" class="statText" text-anchor="middle">${escapeSvgText(stat.value)}</text>
+      </g>`
+    }).join("")
+
+    return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
       <defs>
-        <clipPath id="coverClip"><rect x="96" y="276" width="258" height="350" rx="8" /></clipPath>
+        <clipPath id="coverClip"><rect x="${coverX + 18}" y="${coverY + 32}" width="${coverW - 36}" height="${coverH - 80}" rx="10" /></clipPath>
         <filter id="paperShadow" x="-20%" y="-20%" width="140%" height="140%">
-          <feDropShadow dx="0" dy="12" stdDeviation="12" flood-color="#3a2419" flood-opacity="0.22" />
+          <feDropShadow dx="0" dy="12" stdDeviation="12" flood-color="#000000" flood-opacity="0.22" />
         </filter>
         <filter id="softShadow" x="-20%" y="-20%" width="140%" height="140%">
-          <feDropShadow dx="0" dy="8" stdDeviation="8" flood-color="#3a2419" flood-opacity="0.18" />
+          <feDropShadow dx="0" dy="8" stdDeviation="8" flood-color="#000000" flood-opacity="0.16" />
         </filter>
-        <filter id="roughPaper">
-          <feTurbulence type="fractalNoise" baseFrequency="0.018" numOctaves="4" result="noise" />
-          <feColorMatrix in="noise" type="saturate" values="0" />
-          <feComponentTransfer>
-            <feFuncA type="table" tableValues="0 0.08" />
-          </feComponentTransfer>
-          <feBlend in="SourceGraphic" mode="multiply" />
-        </filter>
-        <pattern id="notebookLines" width="1080" height="38" patternUnits="userSpaceOnUse">
-          <line x1="0" y1="37" x2="1080" y2="37" stroke="#B88B79" stroke-opacity="0.17" stroke-width="2" />
+        <pattern id="notebookLines" width="${width}" height="38" patternUnits="userSpaceOnUse">
+          <line x1="0" y1="37" x2="${width}" y2="37" stroke="${theme.accent}" stroke-opacity="0.16" stroke-width="2" />
         </pattern>
         <pattern id="gridTape" width="28" height="28" patternUnits="userSpaceOnUse">
-          <path d="M 28 0 L 0 0 0 28" fill="none" stroke="#5C473D" stroke-opacity="0.25" stroke-width="1.5" />
+          <path d="M 28 0 L 0 0 0 28" fill="none" stroke="${theme.ink}" stroke-opacity="0.14" stroke-width="1.5" />
         </pattern>
         <style>
-          .label { font: 800 24px Georgia, serif; fill: #8A4F2A; letter-spacing: 2px; text-transform: uppercase; }
-          .title { font: 800 48px Georgia, serif; fill: #2F2420; }
-          .author { font: 700 24px Georgia, serif; fill: #4B3A32; }
-          .statNumber { font: 800 42px Georgia, serif; fill: #2F2420; }
-          .handText { font: 500 32px Georgia, serif; fill: #2F2420; font-style: italic; }
-          .smallText { font: 600 23px Georgia, serif; fill: #4B3A32; }
-          .tinyText { font: 700 19px Georgia, serif; fill: #4B3A32; }
-        .footer { font: 800 14px Georgia, serif; fill: #F3E9DD; letter-spacing: 1.5px; }
-          .placeholderText { font: 700 30px Georgia, serif; fill: #F3E9DD; }
-          .doodle { font: 500 42px Georgia, serif; fill: #B56B6B; }
+          .label { font: 800 22px Georgia, serif; fill: ${theme.label}; letter-spacing: 1.8px; text-transform: uppercase; }
+          .title { font: 800 46px Georgia, serif; fill: ${theme.ink}; }
+          .author { font: 700 24px Georgia, serif; fill: ${theme.ink}; opacity: 0.86; }
+          .statText { font: 800 36px Georgia, serif; fill: ${theme.ink}; }
+          .handText { font: 500 30px Georgia, serif; fill: ${theme.ink}; font-style: italic; }
+          .smallText { font: 600 22px Georgia, serif; fill: ${theme.ink}; }
+          .footer { font: 700 17px Georgia, serif; fill: ${theme.footerText}; letter-spacing: 2.5px; }
+          .placeholderText { font: 700 28px Georgia, serif; fill: #F3E9DD; }
+          .doodle { font: 500 38px Georgia, serif; fill: ${theme.accent}; }
           .coverPlaceholder { fill: #5C524B; }
+          .statCard { fill: ${theme.card}; stroke: ${theme.accent}; stroke-opacity: 0.32; stroke-width: 2; }
         </style>
       </defs>
 
-      <rect width="1080" height="1080" fill="#221A16" />
-      <rect x="0" y="0" width="1080" height="1080" fill="url(#gridTape)" opacity="0.35" />
+      <rect width="${width}" height="${height}" fill="${theme.bg}" />
+      <rect x="0" y="0" width="${width}" height="${height}" fill="url(#gridTape)" opacity="0.35" />
+      <path d="M70 ${56 + topShift / 3} L${width - 66} ${44 + topShift / 3} L${width - 42} ${height - 46} L66 ${height - 54} L42 ${128 + topShift / 3} Z" fill="${theme.paper}" filter="url(#paperShadow)" />
+      <rect x="76" y="${90 + topShift / 3}" width="${width - 152}" height="${height - 170 - topShift / 3}" fill="url(#notebookLines)" opacity="${theme.lines}" />
 
-      <path d="M72 56 L1016 44 L1038 166 L1012 1040 L66 1032 L42 130 Z" fill="#E6DED4" filter="url(#paperShadow)" />
-      <path d="M84 72 L996 62 L1018 1024 L82 1018 L58 150 Z" fill="#F5EBDD" filter="url(#roughPaper)" />
-      <rect x="76" y="90" width="936" height="900" fill="url(#notebookLines)" opacity="0.75" />
+      <path d="M0 ${height - 238} C118 ${height - 290} 232 ${height - 270} 306 ${height - 176} C356 ${height - 110} 352 ${height - 46} 314 ${height} L0 ${height} Z" fill="${theme.gold}" opacity="0.52" />
+      <path d="M${width - 276} 0 L${width} 0 L${width} 156 C${width - 70} 208 ${width - 176} 210 ${width - 238} 140 C${width - 280} 94 ${width - 294} 44 ${width - 276} 0 Z" fill="${theme.accent}" opacity="0.38" />
 
-      <path d="M0 842 C118 790 232 810 306 904 C356 970 352 1034 314 1080 L0 1080 Z" fill="#A0714A" opacity="0.55" />
-      <path d="M0 986 L186 942 L390 982 L604 944 L808 986 L1080 948 L1080 1080 L0 1080 Z" fill="#BFA17A" opacity="0.75" />
-      <path d="M804 0 L1080 0 L1080 156 C1010 208 904 210 842 140 C800 94 786 44 804 0 Z" fill="#B56B6B" opacity="0.44" />
-      <path d="M922 856 L1080 814 L1080 1080 L920 1080 Z" fill="#B56B6B" opacity="0.38" />
-
-      <rect x="420" y="86" width="240" height="44" rx="4" fill="#C29A5A" opacity="0.55" transform="rotate(-1 540 108)" />
-      <text x="540" y="118" class="label" text-anchor="middle">MINI REVIEW</text>
+      <rect x="${width / 2 - 134}" y="${88 + topShift}" width="268" height="46" rx="5" fill="${theme.gold}" opacity="0.62" transform="rotate(-1 ${width / 2} ${111 + topShift})" />
+      <text x="${width / 2}" y="${120 + topShift}" class="label" text-anchor="middle">MINI REVIEW</text>
       ${titleSvg}
-      <rect x="440" y="240" width="200" height="42" rx="3" fill="#D9A99A" opacity="0.55" transform="rotate(-1 540 262)" />
-      <text x="540" y="268" class="author" text-anchor="middle">by ${escapeSvgText(author)}</text>
-      <text x="414" y="266" class="doodle" text-anchor="middle">☆</text>
-      <text x="666" y="266" class="doodle" text-anchor="middle">☆</text>
+      <rect x="${width / 2 - 150}" y="${238 + topShift}" width="300" height="44" rx="4" fill="${theme.accent}" opacity="0.28" transform="rotate(-1 ${width / 2} ${260 + topShift})" />
+      <text x="${width / 2}" y="${268 + topShift}" class="author" text-anchor="middle">by ${escapeSvgText(facts.author)}</text>
 
-      <g filter="url(#softShadow)" transform="rotate(-2 225 450)">
-        <rect x="78" y="244" width="294" height="430" rx="12" fill="#EEE0CF" />
-        <rect x="96" y="276" width="258" height="350" rx="8" fill="#5C524B" />
+      <g filter="url(#softShadow)" transform="rotate(-2 ${coverX + coverW / 2} ${coverY + coverH / 2})">
+        <rect x="${coverX}" y="${coverY}" width="${coverW}" height="${coverH}" rx="14" fill="#EEE0CF" />
         ${coverSvg}
       </g>
-      <rect x="142" y="222" width="158" height="44" rx="2" fill="#D9C58B" opacity="0.68" transform="rotate(-4 221 244)" />
-      <path d="M91 682 C124 696 168 696 212 680" stroke="#B56B6B" stroke-width="3" fill="none" opacity="0.55" />
+      <rect x="${coverX + 54}" y="${coverY - 24}" width="164" height="46" rx="3" fill="${theme.gold}" opacity="0.7" transform="rotate(-4 ${coverX + 136} ${coverY - 1})" />
 
-      <g>
-        <text x="514" y="386" class="label" text-anchor="middle">RATING</text>
-        <text x="514" y="464" class="statNumber" text-anchor="middle">⭐</text>
-        <text x="514" y="534" class="statNumber" text-anchor="middle">${escapeSvgText(rating)}/5</text>
-        <line x1="610" y1="382" x2="610" y2="546" stroke="#B56B6B" stroke-opacity="0.35" stroke-width="2" stroke-dasharray="6 7" />
+      ${statSvg}
 
-        <text x="704" y="386" class="label" text-anchor="middle">SPICE</text>
-        <text x="704" y="464" class="statNumber" text-anchor="middle">🌶️</text>
-        <text x="704" y="534" class="statNumber" text-anchor="middle">${escapeSvgText(spice)}/5</text>
-        <line x1="798" y1="382" x2="798" y2="546" stroke="#B56B6B" stroke-opacity="0.35" stroke-width="2" stroke-dasharray="6 7" />
+      ${fields.review ? `
+        <text x="710" y="${610 + topShift}" class="label" text-anchor="middle">✧ ONE-SENTENCE REVIEW ✧</text>
+        <path d="M424 ${638 + topShift} L948 ${626 + topShift} L962 ${780 + topShift} L434 ${792 + topShift} Z" fill="${theme.card}" stroke="${theme.accent}" stroke-opacity="0.45" stroke-width="2" stroke-dasharray="8 7" filter="url(#softShadow)" />
+        <text x="466" y="${698 + topShift}" class="doodle" text-anchor="middle">“</text>
+        <text x="910" y="${764 + topShift}" class="doodle" text-anchor="middle">”</text>
+        ${quoteSvg}
+      ` : ""}
 
-        <text x="894" y="386" class="label" text-anchor="middle">OBSESSION</text>
-        <text x="894" y="464" class="statNumber" text-anchor="middle">🧠</text>
-        <text x="894" y="534" class="statNumber" text-anchor="middle">${escapeSvgText(obsession)}/5</text>
-      </g>
+      <line x1="90" y1="${bottomY}" x2="${width - 90}" y2="${bottomY}" stroke="${theme.accent}" stroke-opacity="0.34" stroke-width="2" />
+      <line x1="${width / 2}" y1="${bottomY}" x2="${width / 2}" y2="${bottomY + 160}" stroke="${theme.accent}" stroke-opacity="0.34" stroke-width="2" stroke-dasharray="6 7" />
 
-      <text x="686" y="628" class="label" text-anchor="middle">✧ ONE-SENTENCE REVIEW ✧</text>
-      <path d="M424 658 L948 646 L962 786 L434 798 Z" fill="#F1E4D2" stroke="#C6A78E" stroke-width="2" stroke-dasharray="8 7" filter="url(#softShadow)" />
-      <text x="466" y="716" class="doodle" text-anchor="middle">“</text>
-      <text x="910" y="772" class="doodle" text-anchor="middle">”</text>
-      ${quoteSvg}
+      ${fields.vibe ? `<text x="${width * 0.36}" y="${bottomY + 40}" class="label" text-anchor="middle">VIBE CHECK</text>${vibeSvg}` : ""}
+      ${fields.tropes ? `<text x="${width * 0.72}" y="${bottomY + 40}" class="label" text-anchor="middle">TROPES I LOVED</text>${tropeSvg}` : ""}
 
-      <line x1="90" y1="824" x2="970" y2="824" stroke="#B56B6B" stroke-opacity="0.34" stroke-width="2" />
-      <line x1="360" y1="824" x2="360" y2="984" stroke="#B56B6B" stroke-opacity="0.34" stroke-width="2" stroke-dasharray="6 7" />
-      <line x1="680" y1="824" x2="680" y2="984" stroke="#B56B6B" stroke-opacity="0.34" stroke-width="2" stroke-dasharray="6 7" />
-
-      <text x="220" y="864" class="label" text-anchor="middle">BRAIN CHEMISTRY</text>
-      <text x="220" y="895" class="label" text-anchor="middle">BOOKS</text>
-      <text x="220" y="944" class="smallText" text-anchor="middle">${reviewItem.isFavorite ? "🧠 Certified" : "📚 Logged in my"}</text>
-      <text x="220" y="974" class="smallText" text-anchor="middle">${reviewItem.isFavorite ? "brain chemistry read" : "romance archive"}</text>
-
-      <text x="540" y="864" class="label" text-anchor="middle">VIBE CHECK</text>
-      <text x="540" y="852" class="doodle" text-anchor="middle">♡</text>
-      ${vibeSvg}
-
-      <text x="820" y="864" class="label" text-anchor="middle">TROPES I LOVED</text>
-      <text x="820" y="852" class="doodle" text-anchor="middle">♡ ♡ ♡</text>
-      ${tropeSvg}
-
-      <rect x="332" y="1000" width="416" height="50" rx="4" fill="#2F2420" transform="rotate(-1 540 1025)" />
-      <text x="540" y="1033" class="footer" text-anchor="middle" textLength="330" lengthAdjust="spacingAndGlyphs">READ • RATE • ROMANTICIZE ♡</text>
-
-      <path d="M120 1022 C130 968 172 942 210 966 C244 988 230 1036 192 1048 C156 1060 116 1050 120 1022 Z" fill="none" stroke="#4B3A32" stroke-width="3" opacity="0.45" />
-      <text x="166" y="1028" class="tinyText" text-anchor="middle">BRAIN</text>
-      <text x="166" y="1052" class="tinyText" text-anchor="middle">CHEMISTRY</text>
-
-      <g opacity="0.55">
-        <path d="M930 72 C950 40 998 50 984 92 C972 130 926 150 898 118 C874 90 894 54 930 72 Z" fill="none" stroke="#5A2D25" stroke-width="4" />
-        <path d="M906 770 C918 748 944 750 948 774 C952 802 920 814 904 792 C894 778 898 768 906 770 Z" fill="none" stroke="#B56B6B" stroke-width="4" />
-        <path d="M964 890 C946 894 926 884 918 866 C942 858 964 862 982 880 Z" fill="#B56B6B" opacity="0.65" />
-        <line x1="966" y1="892" x2="944" y2="980" stroke="#6F5A3E" stroke-width="4" />
-        <path d="M946 940 C920 934 906 918 904 894 C928 896 946 910 960 932 Z" fill="#C29A5A" opacity="0.55" />
-      </g>
+      <rect x="${width / 2 - 250}" y="${footerY - 34}" width="500" height="54" rx="5" fill="${theme.footer}" transform="rotate(-1 ${width / 2} ${footerY - 7})" />
+      <text x="${width / 2}" y="${footerY}" class="footer" text-anchor="middle" textLength="330" lengthAdjust="spacingAndGlyphs">READ • RATE • ROMANTICIZE ♡</text>
     </svg>`
   }
 
-  function getReviewGraphicDataUrl(reviewItem) {
-    return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(buildReviewGraphicSvg(reviewItem))}`
+  function getReviewGraphicDataUrl(reviewItem, options = {}) {
+    return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(buildReviewGraphicSvg(reviewItem, options))}`
   }
 
-  function downloadSvgFile(reviewItem) {
-    const svg = buildReviewGraphicSvg(reviewItem)
+  function downloadSvgFile(reviewItem, options = {}) {
+    const svg = buildReviewGraphicSvg(reviewItem, options)
     const blob = new Blob([svg], { type: "image/svg+xml;charset=utf-8" })
     const url = URL.createObjectURL(blob)
     const link = document.createElement("a")
@@ -862,15 +927,16 @@ ${review.vibeCheck}`
     URL.revokeObjectURL(url)
   }
 
-  function downloadReviewGraphicPng(reviewItem) {
-    const svgUrl = getReviewGraphicDataUrl(reviewItem)
+  function downloadReviewGraphicPng(reviewItem, options = {}) {
+    const svgUrl = getReviewGraphicDataUrl(reviewItem, options)
     const image = new Image()
     image.crossOrigin = "anonymous"
 
     image.onload = () => {
+      const { width, height } = getReviewGraphicDimensions(options.size || "square")
       const canvas = document.createElement("canvas")
-      canvas.width = 1080
-      canvas.height = 1080
+      canvas.width = width
+      canvas.height = height
       const context = canvas.getContext("2d")
       context.drawImage(image, 0, 0)
 
@@ -883,10 +949,259 @@ ${review.vibeCheck}`
 
     image.onerror = () => {
       setSaveMessage("PNG download had trouble with this cover image. Downloaded an SVG backup instead.")
-      downloadSvgFile(reviewItem)
+      downloadSvgFile(reviewItem, options)
     }
 
     image.src = svgUrl
+  }
+
+
+  function getAchievementGraphicData(achievement = {}, groupTitle = "Achievement") {
+    const safeAchievement = achievement && typeof achievement === "object" ? achievement : {}
+    const current = Number(safeAchievement.current || 0)
+    const target = Number(safeAchievement.target || 0)
+    const unlocked = target ? current >= target : true
+    const progressPercent = target ? Math.min(100, Math.round((current / target) * 100)) : 100
+    const cleanedGroupTitle = String(groupTitle || "Achievement").replace(/^[^A-Za-z0-9]+\s*/, "")
+
+    return {
+      icon: safeAchievement.icon || "🏆",
+      name: safeAchievement.name || "Achievement Unlocked",
+      description: safeAchievement.description || "Unlocked in Pressed Pages.",
+      groupTitle: cleanedGroupTitle,
+      current,
+      target,
+      unlocked,
+      progressPercent,
+    }
+  }
+
+  function buildAchievementGraphicSvg(achievement, groupTitle = "Achievement") {
+    const data = getAchievementGraphicData(achievement, groupTitle)
+    const width = 1080
+    const height = 1080
+    const nameLines = getWrappedSvgLines(data.name.toUpperCase(), 19, 3)
+    const descriptionLines = getWrappedSvgLines(data.description, 34, 4)
+    const progressText = data.target
+      ? `${Math.min(data.current, data.target)} / ${data.target}`
+      : "Unlocked"
+    const safeGroupTitle = escapeSvgText(data.groupTitle.toUpperCase())
+
+    const nameSvg = nameLines
+      .map((line, index) => `<text x="540" y="${438 + index * 58}" class="badge-title" text-anchor="middle">${escapeSvgText(line)}</text>`)
+      .join("")
+
+    const descriptionSvg = descriptionLines
+      .map((line, index) => `<text x="540" y="${655 + index * 34}" class="badge-copy" text-anchor="middle">${escapeSvgText(line)}</text>`)
+      .join("")
+
+    return `
+      <svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
+        <defs>
+          <filter id="badgeShadow" x="-20%" y="-20%" width="140%" height="140%">
+            <feDropShadow dx="0" dy="12" stdDeviation="12" flood-color="#2F2420" flood-opacity="0.22" />
+          </filter>
+          <pattern id="tinyDots" width="34" height="34" patternUnits="userSpaceOnUse">
+            <circle cx="7" cy="8" r="2" fill="#A65434" opacity="0.13" />
+            <circle cx="25" cy="24" r="1.6" fill="#4B3A32" opacity="0.10" />
+          </pattern>
+          <style>
+            .kicker { font: 800 30px Georgia, serif; fill: #F3E9DD; letter-spacing: 5px; }
+            .label { font: 800 27px Georgia, serif; fill: #A65434; letter-spacing: 4px; }
+            .badge-title { font: 900 55px Georgia, serif; fill: #2F2420; letter-spacing: 1px; }
+            .badge-copy { font: 500 27px Georgia, serif; fill: #4B3A32; }
+            .small { font: 800 24px Georgia, serif; fill: #4B3A32; letter-spacing: 2px; }
+            .progress { font: 800 31px Georgia, serif; fill: #2F2420; }
+            .footer { font: 700 20px Georgia, serif; fill: #F3E9DD; letter-spacing: 2px; }
+          </style>
+        </defs>
+
+        <rect width="1080" height="1080" fill="#E6DED4" />
+        <rect width="1080" height="1080" fill="url(#tinyDots)" />
+        <path d="M76 96 C210 58 336 82 462 62 C611 39 718 91 860 68 C946 54 1004 71 1026 96 L1006 1000 C872 1030 758 1000 629 1022 C486 1046 363 1001 219 1023 C134 1036 87 1015 62 989 Z" fill="#F3E9DD" filter="url(#badgeShadow)" />
+        <path d="M91 120 C230 88 333 111 466 91 C612 69 716 117 852 96 C932 84 982 98 1005 118 L986 975 C856 1000 745 973 623 994 C487 1018 369 976 232 997 C150 1009 109 990 86 966 Z" fill="#FFF8EE" opacity="0.58" />
+
+        <rect x="210" y="105" width="660" height="68" rx="7" fill="#2F2420" transform="rotate(-1 540 139)" />
+        <text x="540" y="150" class="kicker" text-anchor="middle">ACHIEVEMENT UNLOCKED</text>
+
+        <g transform="rotate(-4 540 277)">
+          <rect x="381" y="202" width="318" height="156" rx="22" fill="#C29A5A" opacity="0.25" />
+          <rect x="401" y="222" width="278" height="116" rx="18" fill="#A65434" opacity="0.16" />
+          <text x="540" y="310" font-size="94" text-anchor="middle">${escapeSvgText(data.icon)}</text>
+        </g>
+
+        <text x="540" y="392" class="label" text-anchor="middle">${safeGroupTitle}</text>
+        ${nameSvg}
+
+        <line x1="226" y1="575" x2="854" y2="575" stroke="#A65434" stroke-width="4" stroke-opacity="0.28" stroke-dasharray="10 10" />
+        ${descriptionSvg}
+
+        <g transform="translate(210 800)">
+          <text x="330" y="0" class="small" text-anchor="middle">PROGRESS</text>
+          <rect x="0" y="28" width="660" height="42" rx="21" fill="#E6DED4" stroke="#4B3A32" stroke-opacity="0.16" />
+          <rect x="0" y="28" width="${Math.max(18, Math.round(660 * data.progressPercent / 100))}" height="42" rx="21" fill="#A65434" opacity="0.82" />
+          <text x="330" y="112" class="progress" text-anchor="middle">${escapeSvgText(progressText)} • ${data.progressPercent}%</text>
+        </g>
+
+        <g transform="rotate(3 197 218)">
+          <rect x="121" y="195" width="152" height="34" rx="4" fill="#B56B6B" opacity="0.48" />
+        </g>
+        <g transform="rotate(-6 887 849)">
+          <rect x="803" y="831" width="168" height="35" rx="4" fill="#7A8C6A" opacity="0.42" />
+        </g>
+        <text x="165" y="886" font-size="54" opacity="0.38">✦</text>
+        <text x="888" y="265" font-size="48" opacity="0.35">♡</text>
+
+        <rect x="290" y="975" width="500" height="54" rx="5" fill="#2F2420" transform="rotate(-1 540 1002)" />
+        <text x="540" y="1010" class="footer" text-anchor="middle" textLength="330" lengthAdjust="spacingAndGlyphs">READ • RATE • ROMANTICIZE ♡</text>
+      </svg>`
+  }
+
+  function getAchievementGraphicDataUrl(achievement, groupTitle = "Achievement") {
+    return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(buildAchievementGraphicSvg(achievement, groupTitle))}`
+  }
+
+  function downloadAchievementGraphicSvg(achievement = {}, groupTitle = "Achievement") {
+    const data = getAchievementGraphicData(achievement, groupTitle)
+    const svg = buildAchievementGraphicSvg(data, groupTitle)
+    const blob = new Blob([svg], { type: "image/svg+xml;charset=utf-8" })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement("a")
+    link.href = url
+    link.download = `${getSafeFileName(data.name || "achievement")}-achievement.svg`
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    URL.revokeObjectURL(url)
+  }
+
+  function downloadAchievementGraphicPng(achievement = {}, groupTitle = "Achievement") {
+    const data = getAchievementGraphicData(achievement, groupTitle)
+    const svg = buildAchievementGraphicSvg(data, groupTitle)
+    const svgBlob = new Blob([svg], { type: "image/svg+xml;charset=utf-8" })
+    const svgUrl = URL.createObjectURL(svgBlob)
+    const image = new Image()
+
+    image.onload = () => {
+      const canvas = document.createElement("canvas")
+      canvas.width = 1080
+      canvas.height = 1080
+      const context = canvas.getContext("2d")
+
+      if (!context) {
+        URL.revokeObjectURL(svgUrl)
+        downloadAchievementGraphicSvg(data, groupTitle)
+        setSaveMessage("PNG download had trouble, so I downloaded an SVG backup instead.")
+        return
+      }
+
+      context.fillStyle = "#E6DED4"
+      context.fillRect(0, 0, canvas.width, canvas.height)
+      context.drawImage(image, 0, 0)
+
+      const link = document.createElement("a")
+      link.download = `${getSafeFileName(data.name || "achievement")}-achievement.png`
+      link.href = canvas.toDataURL("image/png")
+      link.click()
+      URL.revokeObjectURL(svgUrl)
+      setSaveMessage("Achievement graphic downloaded 🏆")
+    }
+
+    image.onerror = () => {
+      URL.revokeObjectURL(svgUrl)
+      setSaveMessage("PNG download had trouble, so I downloaded an SVG backup instead.")
+      downloadAchievementGraphicSvg(data, groupTitle)
+    }
+
+    image.src = svgUrl
+  }
+
+  function buildReviewCaption(reviewItem, platform = "instagram") {
+    if (!reviewItem) return ""
+
+    const facts = getReviewGraphicFacts(reviewItem)
+    const ratingLine = `⭐ ${facts.rating}/5  |  🌶️ ${facts.spice}/5  |  🔥 ${facts.obsession}/5`
+    const titleLine = `${facts.title} by ${facts.author}`
+    const quoteLine = facts.quote ? `"${facts.quote}"` : ""
+    const vibeLine = facts.vibe ? `Vibe check: ${facts.vibe}` : ""
+    const tropesLine =
+      facts.tropeList.length > 0
+        ? `Tropes: ${facts.tropeList.join(" • ")}`
+        : ""
+
+    if (platform === "story") {
+      return [
+        titleLine,
+        ratingLine,
+        quoteLine,
+        "",
+        "Would you add this to your TBR?",
+      ]
+        .filter(Boolean)
+        .join("\n")
+    }
+
+    if (platform === "pinterest") {
+      return [
+        `${facts.title} book review`,
+        ratingLine,
+        quoteLine,
+        vibeLine,
+        tropesLine,
+        "",
+        "Save this romance book review for your next TBR add.",
+        "#romancebooks #bookreview #bookrecommendations #tbr",
+      ]
+        .filter(Boolean)
+        .join("\n")
+    }
+
+    if (platform === "facebook") {
+      return [
+        `I finished ${titleLine} and had thoughts 📚`,
+        ratingLine,
+        quoteLine,
+        vibeLine,
+        tropesLine,
+        "",
+        "Have you read this one yet?",
+      ]
+        .filter(Boolean)
+        .join("\n")
+    }
+
+    return [
+      `Mini review: ${titleLine}`,
+      ratingLine,
+      "",
+      quoteLine,
+      vibeLine,
+      tropesLine,
+      "",
+      "#romancereader #romancebooks #bookreview #kindleunlimited #bookstagram #tbr",
+    ]
+      .filter(Boolean)
+      .join("\n")
+  }
+
+  async function copyReviewCaption(reviewItem, platform = reviewCaptionPlatform) {
+    const caption = buildReviewCaption(reviewItem, platform)
+
+    try {
+      await navigator.clipboard.writeText(caption)
+      setSaveMessage("Caption copied to clipboard 📋")
+    } catch (error) {
+      console.error("Error copying caption:", error)
+      setSaveMessage("Could not copy automatically. You can select and copy the caption text manually.")
+    }
+  }
+
+  function downloadSocialGraphic(reviewItem, size) {
+    setReviewGraphicSize(size)
+    downloadReviewGraphicPng(reviewItem, {
+      ...getReviewGraphicOptions(),
+      size,
+    })
   }
 
   function getReadingStreakStats() {
@@ -1157,10 +1472,299 @@ ${review.vibeCheck}`
     }
   }
 
+
+
+  function getAchievementStats() {
+    const totalPagesLogged = readingAnalyticsStats.totalPages || 0
+    const finishedBookCount = finishedReviews.length
+    const reviewCount = finishedReviews.length
+    const longestReadingStreak = readingStreakStats.longestStreak || 0
+    const averageRatingValue = Number(averageRating) || 0
+    const averageSpiceValue = Number(averageSpice) || 0
+
+    const countFinishedTropeMatches = (matchers) => {
+      const matcherList = Array.isArray(matchers) ? matchers : [matchers]
+
+      return finishedReviews.filter((item) => {
+        const itemTropes = Array.isArray(item.tropes) ? item.tropes : []
+        return itemTropes.some((trope) => {
+          const normalizedTrope = String(trope || "").toLowerCase()
+          return matcherList.some((matcher) => normalizedTrope.includes(String(matcher).toLowerCase()))
+        })
+      }).length
+    }
+
+    const finishedAuthorCounts = {}
+
+    finishedReviews.forEach((item) => {
+      const author = item.bookInfo.author || "Unknown Author"
+      finishedAuthorCounts[author] = (finishedAuthorCounts[author] || 0) + 1
+    })
+
+    const authorEraAchievements = Object.entries(finishedAuthorCounts)
+      .filter(([author]) => author && author !== "Unknown Author")
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 8)
+      .map(([author, count]) => ({
+        id: `author-era-${author.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`,
+        icon: "📚",
+        name: `Author Era: ${author}`,
+        description: `Read 10 finished books by ${author}.`,
+        current: count,
+        target: 10,
+      }))
+
+    const achievementGroups = [
+      {
+        title: "📚 Books Finished",
+        achievements: [
+          {
+            id: "first-chapter",
+            icon: "📖",
+            name: "First Chapter",
+            description: "Finish your first book.",
+            current: finishedBookCount,
+            target: 1,
+          },
+          {
+            id: "bookworm",
+            icon: "🐛",
+            name: "Bookworm",
+            description: "Finish 10 books.",
+            current: finishedBookCount,
+            target: 10,
+          },
+          {
+            id: "devourer",
+            icon: "🍽️",
+            name: "Devourer",
+            description: "Finish 25 books.",
+            current: finishedBookCount,
+            target: 25,
+          },
+          {
+            id: "bibliophile",
+            icon: "📚",
+            name: "Bibliophile",
+            description: "Finish 50 books.",
+            current: finishedBookCount,
+            target: 50,
+          },
+          {
+            id: "reading-machine",
+            icon: "⚙️",
+            name: "Reading Machine",
+            description: "Finish 100 books.",
+            current: finishedBookCount,
+            target: 100,
+          },
+        ],
+      },
+      {
+        title: "🔥 Reading Streaks",
+        achievements: [
+          {
+            id: "just-getting-started",
+            icon: "🔥",
+            name: "Just Getting Started",
+            description: "Log reading 2 days in a row.",
+            current: longestReadingStreak,
+            target: 2,
+          },
+          {
+            id: "building-momentum",
+            icon: "🚂",
+            name: "Building Momentum",
+            description: "Reach a 7-day reading streak.",
+            current: longestReadingStreak,
+            target: 7,
+          },
+          {
+            id: "habit-formed",
+            icon: "🗓️",
+            name: "Habit Formed",
+            description: "Reach a 30-day reading streak.",
+            current: longestReadingStreak,
+            target: 30,
+          },
+          {
+            id: "dedicated-reader",
+            icon: "🏆",
+            name: "Dedicated Reader",
+            description: "Reach a 100-day reading streak.",
+            current: longestReadingStreak,
+            target: 100,
+          },
+        ],
+      },
+      {
+        title: "📄 Pages Read",
+        achievements: [
+          {
+            id: "turning-pages",
+            icon: "📄",
+            name: "Turning Pages",
+            description: "Log 1,000 pages read.",
+            current: totalPagesLogged,
+            target: 1000,
+          },
+          {
+            id: "page-slayer",
+            icon: "⚔️",
+            name: "Page Slayer",
+            description: "Log 5,000 pages read.",
+            current: totalPagesLogged,
+            target: 5000,
+          },
+          {
+            id: "marathon-reader",
+            icon: "🏃‍♀️",
+            name: "Marathon Reader",
+            description: "Log 10,000 pages read.",
+            current: totalPagesLogged,
+            target: 10000,
+          },
+          {
+            id: "library-conqueror",
+            icon: "🏰",
+            name: "Library Conqueror",
+            description: "Log 25,000 pages read.",
+            current: totalPagesLogged,
+            target: 25000,
+          },
+        ],
+      },
+      {
+        title: "⭐ Reviews",
+        achievements: [
+          {
+            id: "first-thoughts",
+            icon: "💭",
+            name: "First Thoughts",
+            description: "Save your first finished review.",
+            current: reviewCount,
+            target: 1,
+          },
+          {
+            id: "critic",
+            icon: "📝",
+            name: "Critic",
+            description: "Save 25 finished reviews.",
+            current: reviewCount,
+            target: 25,
+          },
+          {
+            id: "reviewer-extraordinaire",
+            icon: "🌟",
+            name: "Reviewer Extraordinaire",
+            description: "Save 100 finished reviews.",
+            current: reviewCount,
+            target: 100,
+          },
+        ],
+      },
+      {
+        title: "💘 Romance Reader",
+        achievements: [
+          {
+            id: "small-town-sweetheart",
+            icon: "🏡",
+            name: "Small Town Sweetheart",
+            description: "Finish 5 Small Town romances.",
+            current: countFinishedTropeMatches("small town"),
+            target: 5,
+          },
+          {
+            id: "sunshine-collector",
+            icon: "☀️",
+            name: "Sunshine Collector",
+            description: "Finish 5 Grumpy/Sunshine romances.",
+            current: countFinishedTropeMatches(["grumpy", "sunshine"]),
+            target: 5,
+          },
+          {
+            id: "found-family-fanatic",
+            icon: "👨‍👩‍👧",
+            name: "Found Family Fanatic",
+            description: "Finish 5 Found Family romances.",
+            current: countFinishedTropeMatches("found family"),
+            target: 5,
+          },
+          {
+            id: "fake-dating-enthusiast",
+            icon: "💌",
+            name: "Fake Dating Enthusiast",
+            description: "Finish 5 Fake Dating romances.",
+            current: countFinishedTropeMatches("fake dating"),
+            target: 5,
+          },
+          {
+            id: "spice-enthusiast",
+            icon: "🌶️",
+            name: "Spice Enthusiast",
+            description: "Maintain a 3.0+ average spice rating.",
+            current: averageSpiceValue,
+            target: 3,
+          },
+          {
+            id: "fire-alarm-activated",
+            icon: "🚨",
+            name: "Fire Alarm Activated",
+            description: "Maintain a 4.0+ average spice rating.",
+            current: averageSpiceValue,
+            target: 4,
+          },
+          {
+            id: "impossible-standards",
+            icon: "⭐",
+            name: "Impossible Standards",
+            description: "Maintain a 4.5+ average rating.",
+            current: averageRatingValue,
+            target: 4.5,
+          },
+        ],
+      },
+      {
+        title: "📚 Repeatable Achievements",
+        achievements: authorEraAchievements.length
+          ? authorEraAchievements
+          : [
+              {
+                id: "author-era-placeholder",
+                icon: "📚",
+                name: "Author Era",
+                description: "Read 10 finished books by the same author.",
+                current: 0,
+                target: 10,
+              },
+            ],
+      },
+    ]
+
+    const allAchievements = achievementGroups.flatMap((group) => group.achievements)
+    const unlockedAchievements = allAchievements.filter(
+      (achievement) => Number(achievement.current || 0) >= achievement.target
+    )
+
+    return {
+      groups: achievementGroups,
+      total: allAchievements.length,
+      unlocked: unlockedAchievements.length,
+      nextAchievement: allAchievements
+        .filter((achievement) => Number(achievement.current || 0) < achievement.target)
+        .sort((a, b) => {
+          const aPercent = a.target ? Number(a.current || 0) / a.target : 0
+          const bPercent = b.target ? Number(b.current || 0) / b.target : 0
+          return bPercent - aPercent
+        })[0],
+    }
+  }
+
   const readingStreakStats = getReadingStreakStats()
   const readingAnalyticsStats = getReadingAnalyticsStats()
   const readingCalendarStats = getReadingCalendarStats(calendarMonthKey)
   const readingGoalStats = getReadingGoalStats()
+  const achievementStats = getAchievementStats()
 
   const currentYear = new Date().getFullYear()
 
@@ -2169,6 +2773,76 @@ ${percent}%`
           </div>
 
           <div className="score-card">
+            <p>🏆 Achievements</p>
+            <h2>{achievementStats.unlocked} / {achievementStats.total} unlocked</h2>
+            <ProgressBar percent={achievementStats.total ? Math.round((achievementStats.unlocked / achievementStats.total) * 100) : 0} />
+
+            {achievementStats.nextAchievement && (
+              <p>
+                Next up: {achievementStats.nextAchievement.icon} {achievementStats.nextAchievement.name} ({Math.min(Number(achievementStats.nextAchievement.current || 0), achievementStats.nextAchievement.target)} / {achievementStats.nextAchievement.target})
+              </p>
+            )}
+
+            {achievementStats.groups.map((group) => (
+              <div key={group.title} style={{ marginTop: "1.5rem" }}>
+                <h3>{group.title}</h3>
+
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+                    gap: "1rem",
+                  }}
+                >
+                  {group.achievements.map((achievement) => {
+                    const current = Number(achievement.current || 0)
+                    const unlocked = current >= achievement.target
+                    const progressPercent = achievement.target
+                      ? Math.min(100, Math.round((current / achievement.target) * 100))
+                      : 0
+
+                    return (
+                      <div
+                        key={achievement.id}
+                        style={{
+                          border: unlocked
+                            ? "2px solid rgba(166, 84, 52, 0.75)"
+                            : "1px solid rgba(47, 36, 32, 0.18)",
+                          borderRadius: "1rem",
+                          padding: "1rem",
+                          background: unlocked
+                            ? "rgba(166, 84, 52, 0.14)"
+                            : "rgba(255, 255, 255, 0.45)",
+                        }}
+                      >
+                        <p style={{ fontSize: "2rem", margin: 0 }}>
+                          {unlocked ? achievement.icon : "🔒"}
+                        </p>
+                        <h4 style={{ marginBottom: "0.25rem" }}>{achievement.name}</h4>
+                        <p>{achievement.description}</p>
+                        <p>
+                          {unlocked ? "Unlocked ✅" : `${Math.min(current, achievement.target)} / ${achievement.target}`}
+                        </p>
+                        <ProgressBar percent={progressPercent} />
+                        {unlocked && achievement.id !== "author-era-placeholder" && (
+                          <button
+                            type="button"
+                            className="secondary-button"
+                            style={{ marginTop: "0.75rem", width: "100%" }}
+                            onClick={() => downloadAchievementGraphicPng(achievement, group.title)}
+                          >
+                            🎨 Download Badge Graphic
+                          </button>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="score-card">
             <p>📅 Reading Calendar</p>
 
             <div
@@ -2892,22 +3566,103 @@ ${percent}%`
           <p>Mini-review graphic, pulled from this saved review.</p>
 
           <div className="score-card">
+            <p>Graphic Settings</p>
+
+            <label>
+              Template
+              <select value={reviewGraphicTemplate} onChange={(event) => setReviewGraphicTemplate(event.target.value)}>
+                <option value="scrapbook">Scrapbook</option>
+                <option value="minimal">Minimal</option>
+                <option value="dark">Dark Romance</option>
+                <option value="soft">Soft Romance</option>
+              </select>
+            </label>
+
+            <label>
+              Export Size
+              <select value={reviewGraphicSize} onChange={(event) => setReviewGraphicSize(event.target.value)}>
+                <option value="square">Square Post</option>
+                <option value="story">Instagram/Facebook Story</option>
+                <option value="pinterest">Pinterest</option>
+              </select>
+            </label>
+
+            <div className="button-row">
+              {Object.entries({
+                rating: "Rating",
+                spice: "Spice",
+                obsession: "Obsession",
+                review: "One-Sentence Review",
+                vibe: "Vibe Check",
+                tropes: "Tropes",
+              }).map(([field, label]) => (
+                <button
+                  key={field}
+                  type="button"
+                  className={reviewGraphicFields[field] ? "filter-button active" : "filter-button"}
+                  onClick={() => toggleReviewGraphicField(field)}
+                >
+                  {reviewGraphicFields[field] ? "✓" : "+"} {label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="score-card">
             <p>Preview</p>
             <img
-              src={getReviewGraphicDataUrl(selectedReview)}
+              src={getReviewGraphicDataUrl(selectedReview, getReviewGraphicOptions())}
               alt="Generated review graphic preview"
               className="review-graphic"
             />
           </div>
 
-      
+          <div className="score-card">
+            <p>Social Export</p>
+            <p>Download the review graphic in the format you need.</p>
+
+            <div className="button-row">
+              <button type="button" onClick={() => downloadSocialGraphic(selectedReview, "square")}>
+                Download Square Post
+              </button>
+              <button type="button" onClick={() => downloadSocialGraphic(selectedReview, "story")}>
+                Download Story
+              </button>
+              <button type="button" onClick={() => downloadSocialGraphic(selectedReview, "pinterest")}>
+                Download Pinterest Pin
+              </button>
+            </div>
+          </div>
+
+          <div className="score-card">
+            <p>Auto Caption</p>
+
+            <label>
+              Caption Style
+              <select
+                value={reviewCaptionPlatform}
+                onChange={(event) => setReviewCaptionPlatform(event.target.value)}
+              >
+                <option value="instagram">Instagram Feed</option>
+                <option value="story">Instagram/Facebook Story</option>
+                <option value="facebook">Facebook Post</option>
+                <option value="pinterest">Pinterest Pin</option>
+              </select>
+            </label>
+
+            <pre>{buildReviewCaption(selectedReview, reviewCaptionPlatform)}</pre>
+
+            <button type="button" onClick={() => copyReviewCaption(selectedReview)}>
+              📋 Copy Caption
+            </button>
+          </div>
 
           {saveMessage && <p>{saveMessage}</p>}
 
-          <button onClick={() => downloadReviewGraphicPng(selectedReview)}>
-            Download PNG
+          <button onClick={() => downloadReviewGraphicPng(selectedReview, getReviewGraphicOptions())}>
+            Download Current Preview PNG
           </button>
-          <button onClick={() => downloadSvgFile(selectedReview)}>
+          <button onClick={() => downloadSvgFile(selectedReview, getReviewGraphicOptions())}>
             Download SVG Backup
           </button>
           <button onClick={() => setStep("viewReview")}>Back to Review</button>
