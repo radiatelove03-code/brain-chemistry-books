@@ -4208,6 +4208,84 @@ ${percent}%`
   }, [step, user])
 
 
+  const pageTitles = {
+    activityFeed: "Activity Feed",
+    profile: "Reader Profile",
+    publicProfileView: "Public Profile",
+    publicProfilePreview: "Public Profile Preview",
+    editProfile: "Edit Profile",
+    analytics: "Reading Analytics",
+    currentlyReading: "Currently Reading",
+    readingLog: "Reading Log",
+    library: "Library",
+    viewReview: "Book Review",
+    reviewGraphic: "Review Graphic",
+    readingSummary: "Reading Summary",
+    dnf: "DNF Notes",
+    dnfSummary: "DNF Summary",
+  }
+
+  function getCurrentPageTitle() {
+    if (typeof step === "number") {
+      if (step === 0) return "Book Details"
+      if (step === 1) return "Core Ratings"
+      if (step === 2) return "Romance Metrics"
+      if (step === 3) return "Scrapbook Notes"
+      if (step === 4) return "Obsession Score"
+      if (step === 5) return "Results"
+    }
+
+    return pageTitles[step] || "Pressed Pages"
+  }
+
+  function goHome() {
+    setStep("home")
+  }
+
+  function goBack() {
+    if (typeof step === "number") {
+      setStep(step === 0 ? "home" : step - 1)
+      return
+    }
+
+    const backTargets = {
+      activityFeed: "home",
+      profile: "home",
+      publicProfileView: "home",
+      publicProfilePreview: "profile",
+      editProfile: "profile",
+      analytics: "home",
+      currentlyReading: "home",
+      readingLog: "currentlyReading",
+      library: "home",
+      viewReview: "library",
+      reviewGraphic: "viewReview",
+      readingSummary: 0,
+      dnf: 0,
+      dnfSummary: "dnf",
+    }
+
+    setStep(backTargets[step] ?? "home")
+  }
+
+  function PageNavigation() {
+    if (step === "home") return null
+
+    return (
+      <nav className="page-navigation" aria-label="Page navigation">
+        <button type="button" className="page-nav-button" onClick={goBack}>
+          ← Back
+        </button>
+        <div className="page-navigation-title">
+          {getCurrentPageTitle()}
+        </div>
+        <button type="button" className="page-nav-button" onClick={goHome}>
+          Home
+        </button>
+      </nav>
+    )
+  }
+
   useEffect(() => {
     localStorage.setItem(
       "brainChemistryBooksReadingGoals",
@@ -4216,7 +4294,8 @@ ${percent}%`
   }, [readingGoals])
 
   return (
-    <main>
+    <main className={step === "home" ? "" : "has-page-navigation"}>
+      <PageNavigation />
       {step === "home" && (
         <section>
           <Auth
