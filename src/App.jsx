@@ -4091,7 +4091,7 @@ ${percent}%`
     )
   }
 
-  function ReaderShelves({ books, activeShelf, onShelfChange, emptyName = "this reader" }) {
+  function ReaderShelves({ books, activeShelf, onShelfChange, emptyName = "this reader", onOpenBook }) {
     const shelfStats = getShelfStats(books)
     const shelfBooks = getShelfBooks(books, activeShelf)
     const shelfOptions = [
@@ -4126,7 +4126,13 @@ ${percent}%`
         {shelfBooks.length ? (
           <div className="reader-shelf-grid">
             {shelfBooks.map((item) => (
-              <div key={item.id} className="reader-shelf-book-card">
+              <button
+                type="button"
+                key={item.id}
+                className="reader-shelf-book-card reader-shelf-book-button"
+                onClick={() => onOpenBook?.(item)}
+                aria-label={`Open ${item.bookInfo?.title || "book"} review`}
+              >
                 {item.bookInfo?.coverUrl ? (
                   <img src={item.bookInfo.coverUrl} alt={`${item.bookInfo.title || "Book"} cover`} />
                 ) : (
@@ -4155,7 +4161,7 @@ ${percent}%`
 
                   {item.isFavorite && <p>❤️ Favorite</p>}
                 </div>
-              </div>
+              </button>
             ))}
           </div>
         ) : (
@@ -4215,8 +4221,62 @@ ${percent}%`
     )
   }, [readingGoals])
 
+
+  const pageTitles = {
+    activityFeed: "Activity Feed",
+    analytics: "Stats",
+    currentlyReading: "Currently Reading",
+    dnf: "DNF Notes",
+    dnfSummary: "DNF Summary",
+    editProfile: "Edit Profile",
+    library: "Library",
+    profile: "Reader Profile",
+    publicProfilePreview: "Public Profile Preview",
+    publicProfileView: "Public Profile",
+    readingLog: "Reading Log",
+    readingSummary: "Reading Summary",
+    reviewGraphic: "Review Graphic",
+    viewReview: "Book Review",
+  }
+
+  function goHome() {
+    setStep("home")
+  }
+
+  function goBackFromPage() {
+    const backStepByPage = {
+      activityFeed: "home",
+      analytics: "home",
+      currentlyReading: "home",
+      dnf: "library",
+      dnfSummary: "library",
+      editProfile: "profile",
+      library: "home",
+      profile: "home",
+      publicProfilePreview: "profile",
+      publicProfileView: "home",
+      readingLog: "currentlyReading",
+      readingSummary: "viewReview",
+      reviewGraphic: "viewReview",
+      viewReview: "library",
+    }
+
+    setStep(backStepByPage[step] || "home")
+  }
+
   return (
-    <main>
+    <main className={step === "home" ? "" : "has-page-navigation"}>
+      {step !== "home" && (
+        <nav className="page-navigation" aria-label="Page navigation">
+          <button type="button" className="page-nav-button" onClick={goBackFromPage}>
+            ← Back
+          </button>
+          <span className="page-navigation-title">{pageTitles[step] || "Pressed Pages"}</span>
+          <button type="button" className="page-nav-button" onClick={goHome}>
+            Home
+          </button>
+        </nav>
+      )}
       {step === "home" && (
         <section>
           <Auth
@@ -4515,7 +4575,14 @@ ${percent}%`
             {recentFinishedReads.length ? (
               <div className="profile-recent-grid">
                 {recentFinishedReads.map((item) => (
-                  <div key={item.id} className="profile-recent-book">
+                  <button
+                    type="button"
+                    key={item.id}
+                    className="profile-recent-book"
+                    onClick={() => openSavedReview(item)}
+                    aria-label={`Open ${item.bookInfo.title || "book"} review`}
+                    title={`${item.bookInfo.title || "Untitled Book"} by ${item.bookInfo.author || "Unknown Author"}`}
+                  >
                     {item.bookInfo.coverUrl && (
                       <img src={item.bookInfo.coverUrl} alt={`${item.bookInfo.title} cover`} />
                     )}
@@ -4525,7 +4592,7 @@ ${percent}%`
                     {item.bookInfo.dateFinished && (
                       <p>Finished {formatDate(item.bookInfo.dateFinished)}</p>
                     )}
-                  </div>
+                  </button>
                 ))}
               </div>
             ) : (
@@ -4605,6 +4672,7 @@ ${percent}%`
                 activeShelf={publicProfileShelf}
                 onShelfChange={setPublicProfileShelf}
                 emptyName={`@${publicProfileView.username}`}
+                onOpenBook={openSavedReview}
               />
 
               <button type="button" onClick={() => setStep("home")}>Back Home</button>
@@ -4673,6 +4741,7 @@ ${percent}%`
                 activeShelf={profilePreviewShelf}
                 onShelfChange={setProfilePreviewShelf}
                 emptyName="you"
+                onOpenBook={openSavedReview}
               />
 
               <div className="score-card">
@@ -4687,14 +4756,21 @@ ${percent}%`
                 {recentFinishedReads.length ? (
                   <div className="profile-recent-grid">
                     {recentFinishedReads.map((item) => (
-                      <div key={item.id} className="profile-recent-book">
+                      <button
+                        type="button"
+                        key={item.id}
+                        className="profile-recent-book"
+                        onClick={() => openSavedReview(item)}
+                        aria-label={`Open ${item.bookInfo.title || "book"} review`}
+                        title={`${item.bookInfo.title || "Untitled Book"} by ${item.bookInfo.author || "Unknown Author"}`}
+                      >
                         {item.bookInfo.coverUrl && (
                           <img src={item.bookInfo.coverUrl} alt={`${item.bookInfo.title} cover`} />
                         )}
                         <strong>{item.bookInfo.title || "Untitled Book"}</strong>
                         <p>{item.bookInfo.author || "Unknown Author"}</p>
                         <p>⭐ {item.bookScore}/5</p>
-                      </div>
+                      </button>
                     ))}
                   </div>
                 ) : (

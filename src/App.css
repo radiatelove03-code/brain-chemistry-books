@@ -1420,3 +1420,135 @@ main.has-page-navigation {
     max-height: 116px !important;
   }
 }
+
+
+/* Phase 11B.2: Clickable profile shelves + stat polish */
+.profile-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin: 18px 0 22px;
+}
+
+.profile-stats-grid .score-card {
+  margin: 0;
+  padding: 16px 12px;
+}
+
+.profile-stats-grid .score-card p {
+  margin: 4px 0;
+  line-height: 1.3;
+}
+
+.profile-stats-grid .score-card h2 {
+  margin: 2px 0;
+  font-size: clamp(1.65rem, 5vw, 2.15rem);
+}
+
+.profile-recent-book {
+  cursor: pointer;
+  border-radius: 14px !important;
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+
+.profile-recent-book:hover {
+  background: rgba(217, 184, 176, 0.16) !important;
+  transform: translateY(-2px);
+}
+
+.profile-recent-book:focus-visible,
+.reader-shelf-book-button:focus-visible {
+  outline: 3px solid rgba(184, 154, 166, 0.45);
+  outline-offset: 3px;
+}
+
+.reader-shelves-panel {
+  background:
+    radial-gradient(circle at top left, rgba(246, 183, 200, 0.18), transparent 38%),
+    linear-gradient(135deg, rgba(255, 253, 252, 0.84), rgba(239, 227, 212, 0.72));
+}
+
+.reader-shelf-grid {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 4px 4px 12px;
+  scroll-snap-type: x proximity;
+  -webkit-overflow-scrolling: touch;
+}
+
+.reader-shelf-book-button {
+  flex: 0 0 128px;
+  width: 128px;
+  min-width: 128px;
+  display: block;
+  margin: 0;
+  padding: 10px;
+  text-align: center;
+  cursor: pointer;
+  scroll-snap-align: start;
+  border-radius: 18px;
+}
+
+.reader-shelf-book-button:hover {
+  transform: translateY(-2px);
+  background: rgba(255, 253, 252, 0.92);
+}
+
+.reader-shelf-book-button img,
+.reader-shelf-book-button .reader-shelf-cover-placeholder {
+  width: 82px !important;
+  min-width: 82px !important;
+  max-width: 82px !important;
+  height: 124px !important;
+  min-height: 124px !important;
+  max-height: 124px !important;
+  margin: 0 auto 8px !important;
+}
+
+.reader-shelf-book-button h3 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  margin: 6px 0 4px;
+  font-size: 0.82rem;
+  line-height: 1.15;
+}
+
+.reader-shelf-book-button p {
+  margin: 3px 0;
+  font-size: 0.72rem;
+  line-height: 1.2;
+}
+
+.reader-shelf-book-button p:nth-of-type(n + 3) {
+  display: none;
+}
+
+@media (max-width: 640px) {
+  .profile-stats-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .profile-stats-grid .score-card {
+    padding: 13px 8px;
+  }
+
+  .reader-shelf-book-button {
+    flex-basis: 112px;
+    width: 112px;
+    min-width: 112px;
+  }
+
+  .reader-shelf-book-button img,
+  .reader-shelf-book-button .reader-shelf-cover-placeholder {
+    width: 74px !important;
+    min-width: 74px !important;
+    max-width: 74px !important;
+    height: 112px !important;
+    min-height: 112px !important;
+    max-height: 112px !important;
+  }
+}
