@@ -3689,6 +3689,33 @@ ${percent}%`
       return
     }
 
+    const eventIds = (events || []).map((event) => event.id).filter(Boolean)
+
+    let activityLikeRows = []
+    if (eventIds.length > 0) {
+      const { data: likesData, error: likesError } = await supabase
+        .from("activity_likes")
+        .select("activity_id, user_id")
+        .in("activity_id", eventIds)
+
+      if (likesError) {
+        setActivityFeedMessage(`Likes error: ${likesError.message}`)
+      } else {
+        activityLikeRows = likesData || []
+      }
+    }
+
+    const activityLikeCounts = activityLikeRows.reduce((counts, like) => {
+      counts[like.activity_id] = (counts[like.activity_id] || 0) + 1
+      return counts
+    }, {})
+
+    const likedActivityIds = new Set(
+      activityLikeRows
+        .filter((like) => like.user_id === currentUser.id)
+        .map((like) => like.activity_id)
+    )
+
     const { data: profileRows, error: profilesError } = await supabase
       .from("profiles")
       .select("user_id, username, display_name, avatar_url, profile_data")
@@ -3705,9 +3732,58 @@ ${percent}%`
         ...event,
         readerProfile: profileMap.get(event.user_id) || null,
         isOwnActivity: event.user_id === currentUser.id,
+        likeCount: activityLikeCounts[event.id] || 0,
+        hasLiked: likedActivityIds.has(event.id),
       }))
     )
     setActivityFeedLoading(false)
+  }
+
+  async function toggleActivityLike(activityEvent) {
+    if (!user || !activityEvent?.id) {
+      setActivityFeedMessage("Log in to like reading updates.")
+      return
+    }
+
+    const alreadyLiked = Boolean(activityEvent.hasLiked)
+
+    setActivityFeed((currentFeed) =>
+      currentFeed.map((event) =>
+        event.id === activityEvent.id
+          ? {
+              ...event,
+              hasLiked: !alreadyLiked,
+              likeCount: Math.max(0, Number(event.likeCount || 0) + (alreadyLiked ? -1 : 1)),
+            }
+          : event
+      )
+    )
+
+    if (alreadyLiked) {
+      const { error } = await supabase
+        .from("activity_likes")
+        .delete()
+        .eq("activity_id", activityEvent.id)
+        .eq("user_id", user.id)
+
+      if (error) {
+        setActivityFeedMessage(`Unlike error: ${error.message}`)
+        await loadActivityFeed(user)
+      }
+      return
+    }
+
+    const { error } = await supabase
+      .from("activity_likes")
+      .insert({
+        activity_id: activityEvent.id,
+        user_id: user.id,
+      })
+
+    if (error) {
+      setActivityFeedMessage(`Like error: ${error.message}`)
+      await loadActivityFeed(user)
+    }
   }
 
   async function loadCloudReviews(currentUser) {
@@ -3920,6 +3996,99 @@ ${percent}%`
       month: "short",
       year: "numeric",
     })
+  }
+
+
+  function ReaderCard({
+    reader,
+    stats = {},
+    followStats: cardFollowStats = null,
+    isOwnReader = false,
+    compact = false,
+    meta = "",
+    actionLabel = "",
+    onAction = null,
+    actionDisabled = false,
+  }) {
+    const profileData = reader?.profileData || reader?.profile_data || {}
+    const displayName =
+      reader?.displayName ||
+      reader?.display_name ||
+      profileData.displayName ||
+      (isOwnReader ? "You" : "Pressed Pages Reader")
+    const username =
+      reader?.username ||
+      profileData.username ||
+      "reader"
+    const avatarUrl =
+      profileData.avatarUrl ||
+      reader?.avatarUrl ||
+      reader?.avatar_url ||
+      ""
+    const bio =
+      profileData.bio ||
+      reader?.bio ||
+      (compact ? "Romanticizing their reading life." : "A Pressed Pages reader romanticizing their reading life.")
+    const readingAesthetic =
+      profileData.readingAesthetic ||
+      reader?.readingAesthetic ||
+      "🌸 Scrapbook Reader"
+    const readerType =
+      profileData.readerType ||
+      reader?.readerType ||
+      "📚 TBR Collector"
+    const favoriteSubgenre =
+      profileData.favoriteSubgenre ||
+      profileData.favoriteGenre ||
+      reader?.favoriteSubgenre ||
+      reader?.favoriteGenre ||
+      "🌾 Romance Reader"
+    const booksThisYear =
+      stats?.booksThisYear ??
+      reader?.statsData?.booksThisYear ??
+      reader?.stats_data?.booksThisYear ??
+      0
+
+    return (
+      <div className={compact ? "reader-card reader-card-compact" : "reader-card"}>
+        <div className="reader-card-main">
+          <div className="reader-card-avatar">
+            {avatarUrl ? <img src={avatarUrl} alt={`${displayName} avatar`} /> : <span>📚</span>}
+          </div>
+
+          <div className="reader-card-info">
+            <p className="reader-card-kicker">Reader Card</p>
+            <h3>{displayName}</h3>
+            <p>@{username}</p>
+            {meta && <p>{meta}</p>}
+            {!compact && <p>{bio}</p>}
+
+            <div className="reader-card-flair">
+              <span>{readingAesthetic}</span>
+              <span>{readerType}</span>
+              {!compact && <span>{favoriteSubgenre}</span>}
+            </div>
+          </div>
+        </div>
+
+        <div className="reader-card-footer">
+          <span><strong>{booksThisYear}</strong> books this year</span>
+
+          {cardFollowStats && (
+            <>
+              <span><strong>{cardFollowStats.followers || 0}</strong> follower{Number(cardFollowStats.followers || 0) === 1 ? "" : "s"}</span>
+              <span><strong>{cardFollowStats.following || 0}</strong> following</span>
+            </>
+          )}
+
+          {actionLabel && onAction && (
+            <button type="button" onClick={onAction} disabled={actionDisabled}>
+              {actionLabel}
+            </button>
+          )}
+        </div>
+      </div>
+    )
   }
 
   function ReaderShelves({ books, activeShelf, onShelfChange, emptyName = "this reader" }) {
@@ -4155,16 +4324,19 @@ ${percent}%`
 
                 return (
                   <article key={event.id} className="activity-feed-card">
-                    <div className="activity-feed-reader">
-                      <div className="activity-feed-avatar">
-                        {avatarUrl ? <img src={avatarUrl} alt={`${readerName} avatar`} /> : <span>📚</span>}
-                      </div>
-                      <div>
-                        <strong>{event.isOwnActivity ? "You" : readerName}</strong>
-                        {!event.isOwnActivity && <p>@{readerUsername}</p>}
-                        <p>{formatDate(event.created_at)}</p>
-                      </div>
-                    </div>
+                    <ReaderCard
+                      reader={{
+                        ...reader,
+                        displayName: event.isOwnActivity ? "You" : readerName,
+                        username: readerUsername,
+                        avatarUrl,
+                        profileData,
+                      }}
+                      stats={reader?.stats_data || reader?.statsData || {}}
+                      isOwnReader={event.isOwnActivity}
+                      compact
+                      meta={formatDate(event.created_at)}
+                    />
 
                     <div className="activity-feed-body">
                       <p className="activity-feed-type">{getActivityIcon(event.event_type)} {getActivityLabel(event.event_type)}</p>
@@ -4181,6 +4353,17 @@ ${percent}%`
                           </p>
                           {eventData.oneSentenceReview && <p>“{eventData.oneSentenceReview}”</p>}
                         </div>
+                      </div>
+
+                      <div className="activity-reaction-row">
+                        <button
+                          type="button"
+                          className={event.hasLiked ? "activity-like-button liked" : "activity-like-button"}
+                          onClick={() => toggleActivityLike(event)}
+                        >
+                          {event.hasLiked ? "💗 Liked" : "🤍 Like"}
+                        </button>
+                        <span>{Number(event.likeCount || 0)} {Number(event.likeCount || 0) === 1 ? "like" : "likes"}</span>
                       </div>
                     </div>
                   </article>
@@ -4201,6 +4384,25 @@ ${percent}%`
           <p>{profile.isPublicProfile ? "Public profile is enabled — your reader scrapbook is ready to share." : "Private by default — turn on public sharing when you want a profile link."}</p>
 
           {profileSavedMessage && <p>{profileSavedMessage}</p>}
+
+          <ReaderCard
+            reader={{
+              username: cleanProfileUsername,
+              displayName: profileDisplayName,
+              avatarUrl: profile.avatarUrl,
+              profileData: {
+                ...profile,
+                readingAesthetic: profileReadingAesthetic,
+                readerType: profileReaderType,
+                favoriteSubgenre: profileFavoriteSubgenre,
+              },
+            }}
+            stats={{ booksThisYear: yearToDateCount }}
+            followStats={followStats}
+            isOwnReader
+            actionLabel="Edit Profile"
+            onAction={() => setStep("editProfile")}
+          />
 
           <div className="profile-card">
             <div className="profile-header">
@@ -4356,43 +4558,23 @@ ${percent}%`
 
           {publicProfileView ? (
             <>
-              <div className="profile-card public-profile-card">
-                <div className="profile-header">
-                  <div className="profile-avatar">
-                    {(publicProfileView.profileData?.avatarUrl || publicProfileView.avatarUrl) ? (
-                      <img src={publicProfileView.profileData?.avatarUrl || publicProfileView.avatarUrl} alt={`${publicProfileView.displayName || publicProfileView.username} avatar`} />
-                    ) : (
-                      <span>📚</span>
-                    )}
-                  </div>
-
-                  <div>
-                    <p>Read • Rate • Romanticize</p>
-                    <h2>{publicProfileView.profileData?.displayName || publicProfileView.displayName || "Pressed Pages Reader"}</h2>
-                    <p>@{publicProfileView.username}</p>
-                    <div className="follow-count-row">
-                      <span><strong>{followStats.followers}</strong> follower{followStats.followers === 1 ? "" : "s"}</span>
-                      <span><strong>{followStats.following}</strong> following</span>
-                    </div>
-                    <p>{publicProfileView.profileData?.bio || "A Pressed Pages reader romanticizing their reading life."}</p>
-                  </div>
-                </div>
-
-                <div className="profile-banner">
-                  <p>Reader Flair</p>
-                  <div className="profile-flair-row">
-                    <span>{publicProfileView.profileData?.readingAesthetic || "🌸 Scrapbook Reader"}</span>
-                    <span>{publicProfileView.profileData?.readerType || "📚 TBR Collector"}</span>
-                    <span>{publicProfileView.profileData?.favoriteSubgenre || publicProfileView.profileData?.favoriteGenre || "🌾 Romance Reader"}</span>
-                  </div>
-                </div>
-              </div>
-
-              {user && publicProfileView.userId !== user.id && (
-                <button type="button" onClick={toggleFollowPublicProfile}>
-                  {followStats.isFollowing ? "Following ✓" : "Follow Reader"}
-                </button>
-              )}
+              <ReaderCard
+                reader={publicProfileView}
+                stats={publicProfileView.statsData || {}}
+                followStats={followStats}
+                actionLabel={
+                  user && publicProfileView.userId !== user.id
+                    ? followStats.isFollowing
+                      ? "Following ✓"
+                      : "Follow Reader"
+                    : ""
+                }
+                onAction={
+                  user && publicProfileView.userId !== user.id
+                    ? toggleFollowPublicProfile
+                    : null
+                }
+              />
 
               {!user && <p>Log in to follow @{publicProfileView.username}.</p>}
 
@@ -4448,33 +4630,21 @@ ${percent}%`
 
           {profile.isPublicProfile ? (
             <>
-              <div className="profile-card public-profile-card">
-                <div className="profile-header">
-                  <div className="profile-avatar">
-                    {profile.avatarUrl ? (
-                      <img src={profile.avatarUrl} alt={`${profileDisplayName} avatar`} />
-                    ) : (
-                      <span>📚</span>
-                    )}
-                  </div>
-
-                  <div>
-                    <p>Read • Rate • Romanticize</p>
-                    <h2>{profileDisplayName}</h2>
-                    <p>@{cleanProfileUsername}</p>
-                    <p>{profile.bio || "A Pressed Pages reader romanticizing their reading life."}</p>
-                  </div>
-                </div>
-
-                <div className="profile-banner">
-                  <p>Reader Flair</p>
-                  <div className="profile-flair-row">
-                    <span>{profileReadingAesthetic}</span>
-                    <span>{profileReaderType}</span>
-                    <span>{profileFavoriteSubgenre}</span>
-                  </div>
-                </div>
-              </div>
+              <ReaderCard
+                reader={{
+                  username: cleanProfileUsername,
+                  displayName: profileDisplayName,
+                  avatarUrl: profile.avatarUrl,
+                  profileData: {
+                    ...profile,
+                    readingAesthetic: profileReadingAesthetic,
+                    readerType: profileReaderType,
+                    favoriteSubgenre: profileFavoriteSubgenre,
+                  },
+                }}
+                stats={{ booksThisYear: yearToDateCount }}
+                followStats={followStats}
+              />
 
               <div className="profile-stats-grid">
                 <div className="score-card">
@@ -5563,7 +5733,7 @@ ${percent}%`
             🧠 Brain Chemistry
           </button>
 
-          <div className="score-card">
+          <div className="score-card library-filter-card">
             <p>Smart Library Filters</p>
 
             <label>
