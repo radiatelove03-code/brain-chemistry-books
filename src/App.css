@@ -2039,3 +2039,186 @@ textarea {
   }
 }
 
+
+
+/* Phase 12A.1: Community Challenge Hub */
+.community-challenge-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin: 20px 0;
+}
+
+.community-challenge-summary .score-card {
+  margin: 0;
+  padding: 16px 12px;
+}
+
+.community-challenge-summary .score-card h2 {
+  font-size: clamp(1.8rem, 5vw, 2.4rem);
+}
+
+.community-challenge-grid {
+  display: grid;
+  gap: 16px;
+  margin: 22px 0;
+}
+
+.community-challenge-card {
+  padding: 18px;
+  background:
+    radial-gradient(circle at top left, rgba(246, 183, 200, 0.18), transparent 38%),
+    linear-gradient(135deg, rgba(255, 253, 252, 0.88), rgba(239, 227, 212, 0.72));
+  border: 1px solid rgba(122, 93, 80, 0.22);
+  border-radius: 24px;
+  box-shadow: 0 10px 24px rgba(79, 59, 51, 0.08);
+}
+
+.community-challenge-card.is-joined {
+  border-color: rgba(168, 178, 154, 0.74);
+}
+
+.community-challenge-card.is-complete {
+  box-shadow: 0 12px 28px rgba(122, 93, 80, 0.14), inset 0 0 0 1px rgba(200, 169, 106, 0.45);
+}
+
+.community-challenge-card-header {
+  display: grid;
+  grid-template-columns: 58px 1fr;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.community-challenge-card-header p,
+.community-challenge-card-header h2 {
+  margin: 0;
+}
+
+.community-challenge-icon {
+  width: 58px;
+  height: 58px;
+  display: grid;
+  place-items: center;
+  background: rgba(255, 253, 252, 0.84);
+  border: 1px solid rgba(122, 93, 80, 0.18);
+  border-radius: 18px;
+  font-size: 1.8rem;
+}
+
+.community-challenge-progress-row,
+.community-challenge-meta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 12px;
+  color: var(--vintage-cocoa);
+}
+
+.community-challenge-progress-row strong {
+  color: var(--deep-cocoa);
+  font-size: 1.35rem;
+}
+
+.community-challenge-progress {
+  margin: 12px 0 8px;
+}
+
+.community-challenge-books {
+  margin-top: 14px;
+  padding: 12px;
+  background: rgba(255, 253, 252, 0.58);
+  border: 1px dashed rgba(122, 93, 80, 0.2);
+  border-radius: 16px;
+}
+
+.community-challenge-books p {
+  margin: 0 0 8px;
+  font-weight: bold;
+}
+
+.community-challenge-books button {
+  width: auto;
+  margin: 4px 6px 4px 0;
+  padding: 8px 11px;
+  background: rgba(255, 253, 252, 0.86);
+  font-size: 0.86rem;
+}
+
+.community-challenge-complete {
+  margin-top: 12px;
+  padding: 10px 12px;
+  background: rgba(200, 169, 106, 0.2);
+  border: 1px solid rgba(200, 169, 106, 0.35);
+  border-radius: 14px;
+  color: var(--deep-cocoa);
+  font-weight: bold;
+  text-align: center;
+}
+
+@media (max-width: 640px) {
+  .community-challenge-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .community-challenge-card {
+    padding: 16px 14px;
+  }
+
+  .community-challenge-card-header {
+    grid-template-columns: 48px 1fr;
+  }
+
+  .community-challenge-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 15px;
+    font-size: 1.5rem;
+  }
+
+  .community-challenge-meta,
+  .community-challenge-progress-row {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .community-challenge-books button {
+    width: 100%;
+    margin-right: 0;
+  }
+}
+
+
+/* Phase 12A.2 bug-fix: preserve Phase 11/12 layout + Android viewport guard */
+html,
+body,
+#root {
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+@supports (-webkit-touch-callout: none) {
+  body {
+    -webkit-text-size-adjust: 100%;
+  }
+}
+
+@media (max-width: 640px) {
+  .page-navigation,
+  section,
+  .community-challenge-card,
+  .library-book-card,
+  .add-book-choice-card,
+  .backlog-import-panel {
+    max-width: 100%;
+  }
+
+  .community-challenge-grid,
+  .library-results-grid,
+  .add-book-choice-grid {
+    width: 100%;
+    min-width: 0;
+  }
+}

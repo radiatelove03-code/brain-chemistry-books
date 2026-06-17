@@ -53,6 +53,77 @@ const favoriteSubgenreOptions = [
   "💐 Contemporary Romance",
 ]
 
+
+
+const communityChallenges = [
+  {
+    id: "romance-sprint",
+    icon: "💕",
+    title: "Romance Sprint",
+    subtitle: "Read 5 finished books and fill your shelves with fresh romance wins.",
+    goal: 5,
+    label: "Finished books",
+    tag: "Starter challenge",
+    ends: "Ongoing",
+    matchType: "finished",
+  },
+  {
+    id: "small-town-stack",
+    icon: "🌻",
+    title: "Small Town Stack",
+    subtitle: "Read 3 books with small-town energy, found family, porch swings, or local drama.",
+    goal: 3,
+    label: "Small Town books",
+    tag: "Trope challenge",
+    ends: "Ongoing",
+    matchType: "small-town",
+  },
+  {
+    id: "spice-shelf",
+    icon: "🌶️",
+    title: "Spice Shelf",
+    subtitle: "Finish 3 books with a spice rating of 3 or higher.",
+    goal: 3,
+    label: "Spicy reads",
+    tag: "Mood challenge",
+    ends: "Ongoing",
+    matchType: "spicy",
+  },
+  {
+    id: "brain-chemistry",
+    icon: "🧠",
+    title: "Brain Chemistry Books",
+    subtitle: "Mark 3 finished reads as favorites because some books alter the wiring permanently.",
+    goal: 3,
+    label: "Favorite reads",
+    tag: "Favorites challenge",
+    ends: "Ongoing",
+    matchType: "favorite",
+  },
+  {
+    id: "dark-and-dangerous",
+    icon: "🖤",
+    title: "Dark & Dangerous",
+    subtitle: "Read 3 dark romance, paranormal, fantasy, or suspense-leaning books.",
+    goal: 3,
+    label: "Darker reads",
+    tag: "Genre challenge",
+    ends: "Ongoing",
+    matchType: "dark",
+  },
+  {
+    id: "fresh-pages",
+    icon: "📚",
+    title: "Fresh Pages",
+    subtitle: "Add 10 finished books to your library, including backlog imports and already-read books.",
+    goal: 10,
+    label: "Finished books added",
+    tag: "Library builder",
+    ends: "Ongoing",
+    matchType: "finished",
+  },
+]
+
 function App() {
   const [step, setStep] = useState("home")
   const [user, setUser] = useState(null)
@@ -136,6 +207,15 @@ function App() {
     { title: "", author: "", rating: "", dateFinished: "" },
     { title: "", author: "", rating: "", dateFinished: "" },
   ])
+  const [joinedCommunityChallengeIds, setJoinedCommunityChallengeIds] = useState(() => {
+    try {
+      const saved = localStorage.getItem("pressedPagesJoinedCommunityChallenges")
+      const parsed = saved ? JSON.parse(saved) : []
+      return Array.isArray(parsed) ? parsed : []
+    } catch {
+      return []
+    }
+  })
   const [progressInputs, setProgressInputs] = useState({})
   const [readingLogDrafts, setReadingLogDrafts] = useState({})
   const [readingLogDirty, setReadingLogDirty] = useState({})
@@ -296,6 +376,82 @@ function App() {
 
     return true
   })
+
+
+  const joinedCommunityChallengeSet = new Set(
+    Array.isArray(joinedCommunityChallengeIds) ? joinedCommunityChallengeIds : []
+  )
+
+  function doesBookMatchCommunityChallenge(item, challenge) {
+    const bookInfo = item?.bookInfo || {}
+    const status = bookInfo.status || ""
+    const genre = String(bookInfo.genre || "").toLowerCase()
+    const tropes = Array.isArray(item?.tropes) ? item.tropes : []
+    const metrics = item?.metrics || {}
+    const isFinished = status === "Finished"
+
+    if (!isFinished) return false
+
+    if (challenge.matchType === "small-town") {
+      return tropes.includes("Small Town") || genre.includes("small town")
+    }
+
+    if (challenge.matchType === "spicy") {
+      return Number(metrics.spice || 0) >= 3
+    }
+
+    if (challenge.matchType === "favorite") {
+      return Boolean(item?.isFavorite)
+    }
+
+    if (challenge.matchType === "dark") {
+      return (
+        tropes.includes("Dark Romance") ||
+        genre.includes("dark") ||
+        genre.includes("paranormal") ||
+        genre.includes("fantasy") ||
+        genre.includes("suspense")
+      )
+    }
+
+    return isFinished
+  }
+
+  function getCommunityChallengeProgress(challenge) {
+    const safeReviews = Array.isArray(savedReviews) ? savedReviews : []
+    const matchingBooks = safeReviews.filter((item) => doesBookMatchCommunityChallenge(item, challenge))
+    const progress = Math.min(challenge.goal, matchingBooks.length)
+    const percent = challenge.goal > 0 ? Math.min(100, Math.round((progress / challenge.goal) * 100)) : 0
+
+    return {
+      progress,
+      total: matchingBooks.length,
+      percent,
+      isComplete: progress >= challenge.goal,
+      recentBooks: matchingBooks
+        .slice()
+        .sort((a, b) => {
+          const aDate = new Date(a?.bookInfo?.dateFinished || a?.createdAt || 0).getTime() || 0
+          const bDate = new Date(b?.bookInfo?.dateFinished || b?.createdAt || 0).getTime() || 0
+          return bDate - aDate
+        })
+        .slice(0, 3),
+    }
+  }
+
+  function toggleCommunityChallenge(challengeId) {
+    setJoinedCommunityChallengeIds((currentIds) => {
+      const safeIds = Array.isArray(currentIds) ? currentIds : []
+      return safeIds.includes(challengeId)
+        ? safeIds.filter((id) => id !== challengeId)
+        : [...safeIds, challengeId]
+    })
+  }
+
+  const completedCommunityChallengeCount = communityChallenges.filter((challenge) => {
+    const progress = getCommunityChallengeProgress(challenge)
+    return joinedCommunityChallengeSet.has(challenge.id) && progress.isComplete
+  }).length
 
   function resetLibraryFilters() {
     setLibraryFilter("all")
@@ -2990,6 +3146,50 @@ ${readingProgressPercent}%`
     return true
   }
 
+
+  async function saveReviewBasicChanges() {
+    if (!editingReviewId) return
+
+    const existingReview = savedReviews.find((item) => item.id === editingReviewId)
+
+    if (!existingReview) {
+      setSaveMessage("Could not find this review to update.")
+      return
+    }
+
+    const now = new Date().toISOString()
+    const cleanedBookInfo = {
+      ...existingReview.bookInfo,
+      ...bookInfo,
+      title: bookInfo.title || existingReview.bookInfo?.title || "",
+      author: bookInfo.author || existingReview.bookInfo?.author || "",
+      dateStarted:
+        bookInfo.dateStarted ||
+        (bookInfo.status === "Reading" ? existingReview.bookInfo?.dateStarted || now : existingReview.bookInfo?.dateStarted || ""),
+      dateFinished:
+        bookInfo.dateFinished ||
+        (bookInfo.status === "Finished" ? existingReview.bookInfo?.dateFinished || now : existingReview.bookInfo?.dateFinished || ""),
+    }
+
+    const updatedReview = {
+      ...existingReview,
+      bookInfo: cleanedBookInfo,
+      updatedAt: now,
+    }
+
+    const updatedReviews = savedReviews.map((item) =>
+      item.id === editingReviewId ? updatedReview : item
+    )
+
+    const saved = await saveReviewsToStorage(updatedReviews, updatedReview, editingReviewId)
+
+    if (saved) {
+      setSelectedReview(updatedReview)
+      setSaveMessage("Basic book details saved ✨")
+      setStep("viewReview")
+    }
+  }
+
   async function logReadingProgress(reviewId) {
     const reviewItem = savedReviews.find((item) => item.id === reviewId)
     if (!reviewItem) return
@@ -4443,6 +4643,14 @@ ${percent}%`
 
   useEffect(() => {
     localStorage.setItem(
+      "pressedPagesJoinedCommunityChallenges",
+      JSON.stringify(Array.isArray(joinedCommunityChallengeIds) ? joinedCommunityChallengeIds : [])
+    )
+  }, [joinedCommunityChallengeIds])
+
+
+  useEffect(() => {
+    localStorage.setItem(
       "brainChemistryBooksReadingGoals",
       JSON.stringify(readingGoals)
     )
@@ -4451,6 +4659,7 @@ ${percent}%`
 
   const pageTitles = {
     activityFeed: "Activity Feed",
+    communityChallenges: "Challenge Hub",
     addBook: "Add Book",
     alreadyRead: "Already Read",
     backlogImport: "Backlog Import",
@@ -4476,6 +4685,7 @@ ${percent}%`
   function goBackFromPage() {
     const backStepByPage = {
       activityFeed: "home",
+      communityChallenges: "home",
       addBook: "home",
       alreadyRead: "addBook",
       backlogImport: "addBook",
@@ -4547,6 +4757,7 @@ ${percent}%`
           <button onClick={() => setStep("library")}>View Library</button>
           <button onClick={() => setStep("analytics")}>Reading Analytics</button>
           <button onClick={() => setStep("activityFeed")}>Activity Feed</button>
+          <button onClick={() => setStep("communityChallenges")}>Community Challenges</button>
           <button onClick={() => setStep("profile")}>Reader Profile</button>
 
           {savedReviews.length > 0 && (
@@ -4748,6 +4959,100 @@ ${percent}%`
         </section>
       )}
 
+
+
+      {step === "communityChallenges" && (
+        <section>
+          <p>Phase 12A • Community Challenges</p>
+          <h1>Challenge Hub</h1>
+          <p>Join cozy reading challenges, track your progress automatically from your library, and collect future badges for your reader profile.</p>
+
+          <div className="community-challenge-summary">
+            <div className="score-card">
+              <p>Joined</p>
+              <h2>{joinedCommunityChallengeIds.length}</h2>
+              <p>challenge{joinedCommunityChallengeIds.length === 1 ? "" : "s"}</p>
+            </div>
+            <div className="score-card">
+              <p>Completed</p>
+              <h2>{completedCommunityChallengeCount}</h2>
+              <p>finished challenge{completedCommunityChallengeCount === 1 ? "" : "s"}</p>
+            </div>
+            <div className="score-card">
+              <p>Available</p>
+              <h2>{communityChallenges.length}</h2>
+              <p>starter challenges</p>
+            </div>
+          </div>
+
+          <div className="community-challenge-grid">
+            {communityChallenges.map((challenge) => {
+              const challengeProgress = getCommunityChallengeProgress(challenge)
+              const isJoined = joinedCommunityChallengeSet.has(challenge.id)
+
+              return (
+                <article
+                  className={`community-challenge-card ${isJoined ? "is-joined" : ""} ${challengeProgress.isComplete ? "is-complete" : ""}`}
+                  key={challenge.id}
+                >
+                  <div className="community-challenge-card-header">
+                    <span className="community-challenge-icon">{challenge.icon}</span>
+                    <div>
+                      <p>{challenge.tag}</p>
+                      <h2>{challenge.title}</h2>
+                    </div>
+                  </div>
+
+                  <p>{challenge.subtitle}</p>
+
+                  <div className="community-challenge-progress-row">
+                    <strong>{challengeProgress.progress}/{challenge.goal}</strong>
+                    <span>{challenge.label}</span>
+                  </div>
+
+                  <div className="progress-bar community-challenge-progress">
+                    <div className="progress-fill" style={{ width: `${challengeProgress.percent}%` }} />
+                    <span>{challengeProgress.percent}%</span>
+                  </div>
+
+                  <div className="community-challenge-meta">
+                    <span>Ends: {challenge.ends}</span>
+                    <span>{challengeProgress.total} matching book{challengeProgress.total === 1 ? "" : "s"}</span>
+                  </div>
+
+                  {challengeProgress.recentBooks.length > 0 && (
+                    <div className="community-challenge-books">
+                      <p>Recent matches</p>
+                      {challengeProgress.recentBooks.map((book) => (
+                        <button
+                          type="button"
+                          key={book.id || `${book?.bookInfo?.title}-${book?.bookInfo?.author}`}
+                          onClick={() => openSavedReview(book)}
+                        >
+                          {book?.bookInfo?.title || "Untitled Book"}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  {challengeProgress.isComplete && isJoined && (
+                    <p className="community-challenge-complete">🏆 Challenge complete!</p>
+                  )}
+
+                  <button type="button" onClick={() => toggleCommunityChallenge(challenge.id)}>
+                    {isJoined ? "Leave Challenge" : "Join Challenge"}
+                  </button>
+                </article>
+              )
+            })}
+          </div>
+
+          <div className="score-card">
+            <p>Coming Next</p>
+            <p>Challenge badges and profile flair are next, so completed challenges can become collectible reader trophies.</p>
+          </div>
+        </section>
+      )}
 
       {step === "activityFeed" && (
         <section>
@@ -6784,6 +7089,12 @@ ${percent}%`
               <option>DNF</option>
             </select>
           </label>
+
+          {editingReviewId && (
+            <button type="button" onClick={saveReviewBasicChanges}>
+              Save Basic Changes
+            </button>
+          )}
 
           <button onClick={() => setStep("home")}>Back Home</button>
           <button onClick={handleBookInfoNext}>
