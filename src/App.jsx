@@ -2,6 +2,7 @@ import { useState, useEffect } from "react"
 import { supabase } from "./lib/supabase"
 import Auth from "./Auth"
 import "./App.css"
+import ProgressBar from "./components/ProgressBar"
 
 const tropeOptions = [
   "Small Town",
@@ -7895,14 +7896,6 @@ ${percent}%`
 }
 
 
-function ProgressBar({ percent }) {
-  return (
-    <div className="progress-bar">
-      <div className="progress-fill" style={{ width: `${percent}%` }}></div>
-      <span>{percent}%</span>
-    </div>
-  )
-}
 
 function DateInput({ label, value, onChange }) {
   const dateValue = value ? value.slice(0, 10) : ""
