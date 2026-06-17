@@ -632,3 +632,337 @@ background: #F6B7C8;
     align-items: flex-start;
   }
 }
+
+.year-books-hero {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin: 18px 0;
+}
+
+.year-books-hero div,
+.year-books-grid div {
+  padding: 16px;
+  background: rgba(255, 253, 252, 0.78);
+  border: 1px solid rgba(122, 93, 80, 0.22);
+  border-radius: 18px;
+  text-align: center;
+  box-shadow: 0 8px 18px rgba(79, 59, 51, 0.08);
+}
+
+.year-books-hero strong {
+  display: block;
+  color: var(--deep-cocoa);
+  font-size: 2rem;
+  line-height: 1;
+}
+
+.year-books-hero span {
+  display: block;
+  margin-top: 8px;
+  color: var(--vintage-cocoa);
+  font-size: 0.95rem;
+  font-weight: bold;
+}
+
+.year-books-graphic-preview {
+  width: min(100%, 360px);
+  display: block;
+  margin: 0 auto 14px;
+  border-radius: 18px;
+  box-shadow: 0 14px 32px rgba(79, 59, 51, 0.18);
+  border: 1px solid rgba(122, 93, 80, 0.18);
+}
+
+.year-books-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin: 18px 0;
+}
+
+.year-books-grid p {
+  margin: 0 0 6px;
+  color: var(--vintage-cocoa);
+  font-size: 0.95rem;
+}
+
+.year-books-grid h3 {
+  margin: 0;
+  font-size: 1.55rem;
+}
+
+.year-books-months {
+  margin-top: 18px;
+  padding: 16px;
+  background: rgba(255, 253, 252, 0.72);
+  border: 1px dashed rgba(122, 93, 80, 0.28);
+  border-radius: 20px;
+}
+
+.year-books-months > div {
+  display: grid;
+  grid-template-columns: 44px 1fr 34px;
+  align-items: center;
+  gap: 10px;
+  margin: 9px 0;
+  color: var(--deep-cocoa);
+}
+
+.year-books-month-bar {
+  height: 14px;
+  overflow: hidden;
+  background: rgba(239, 227, 212, 0.95);
+  border: 1px solid rgba(122, 93, 80, 0.18);
+  border-radius: 999px;
+}
+
+.year-books-month-bar span {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, var(--pressed-rose), var(--dried-sage));
+  border-radius: 999px;
+}
+
+@media (max-width: 640px) {
+  .year-books-hero,
+  .year-books-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .year-books-months > div {
+    grid-template-columns: 42px 1fr 28px;
+  }
+}
+
+.follow-count-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 10px 0;
+  color: var(--vintage-cocoa);
+}
+
+.follow-count-row span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 7px 10px;
+  background: rgba(255, 253, 252, 0.78);
+  border: 1px solid rgba(122, 93, 80, 0.2);
+  border-radius: 999px;
+  box-shadow: 0 5px 12px rgba(79, 59, 51, 0.07);
+}
+
+.follow-count-row strong {
+  color: var(--deep-cocoa);
+}
+
+.activity-feed-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 18px 0;
+}
+
+.activity-feed-actions button {
+  margin: 0;
+}
+
+.activity-feed-list {
+  display: grid;
+  gap: 16px;
+  margin: 22px 0;
+}
+
+.activity-feed-card {
+  padding: 18px;
+  background: rgba(255, 253, 252, 0.78);
+  border: 1px dashed rgba(122, 93, 80, 0.28);
+  border-radius: 22px;
+  box-shadow: 0 10px 24px rgba(79, 59, 51, 0.08);
+}
+
+.activity-feed-reader {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.activity-feed-reader p {
+  margin: 2px 0;
+  font-size: 0.92rem;
+}
+
+.activity-feed-avatar {
+  width: 58px;
+  height: 58px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  overflow: hidden;
+  background: rgba(217, 184, 176, 0.28);
+  border: 5px solid var(--soft-linen);
+  border-radius: 18px;
+  box-shadow: 0 8px 18px rgba(79, 59, 51, 0.12);
+}
+
+.activity-feed-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.activity-feed-type {
+  margin: 0 0 10px;
+  font-weight: bold;
+  color: var(--deep-cocoa);
+}
+
+.activity-feed-book {
+  display: grid;
+  grid-template-columns: 84px 1fr;
+  gap: 14px;
+  align-items: start;
+}
+
+.activity-feed-book img {
+  width: 84px;
+  border-radius: 12px;
+  border: 5px solid var(--soft-linen);
+  box-shadow: 0 10px 20px rgba(79, 59, 51, 0.14);
+}
+
+.activity-feed-book h3 {
+  margin: 0 0 6px;
+}
+
+.activity-feed-book p {
+  margin: 5px 0;
+}
+
+@media (max-width: 640px) {
+  .activity-feed-book {
+    grid-template-columns: 1fr;
+  }
+
+  .activity-feed-book img {
+    width: 110px;
+  }
+}
+
+
+.reader-shelves-panel {
+  margin: 22px 0;
+  padding: 18px;
+  background: rgba(255, 253, 252, 0.72);
+  border: 1px dashed rgba(122, 93, 80, 0.28);
+  border-radius: 24px;
+}
+
+.reader-shelves-header p {
+  margin: 0 0 4px;
+  color: var(--vintage-cocoa);
+  font-style: italic;
+}
+
+.reader-shelves-header h2 {
+  margin: 0 0 14px;
+}
+
+.reader-shelf-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.reader-shelf-stats button {
+  width: 100%;
+  margin: 0;
+  padding: 12px 10px;
+  border-radius: 18px;
+  background: rgba(255, 253, 252, 0.84);
+}
+
+.reader-shelf-stats button.active {
+  background: var(--deep-cocoa);
+  color: var(--soft-linen);
+  border-color: var(--deep-cocoa);
+}
+
+.reader-shelf-stats span,
+.reader-shelf-stats strong {
+  display: block;
+}
+
+.reader-shelf-stats strong {
+  font-size: 1.35rem;
+  line-height: 1.1;
+}
+
+.reader-shelf-grid {
+  display: grid;
+  gap: 14px;
+}
+
+.reader-shelf-book-card {
+  display: grid;
+  grid-template-columns: 86px 1fr;
+  gap: 14px;
+  align-items: start;
+  padding: 14px;
+  background: rgba(247, 241, 232, 0.78);
+  border: 1px solid rgba(122, 93, 80, 0.2);
+  border-radius: 20px;
+  box-shadow: 0 8px 18px rgba(79, 59, 51, 0.08);
+}
+
+.reader-shelf-book-card img,
+.reader-shelf-cover-placeholder {
+  width: 86px;
+  min-height: 126px;
+  border-radius: 12px;
+  border: 5px solid var(--soft-linen);
+  box-shadow: 0 10px 20px rgba(79, 59, 51, 0.14);
+}
+
+.reader-shelf-book-card img {
+  object-fit: cover;
+}
+
+.reader-shelf-cover-placeholder {
+  display: grid;
+  place-items: center;
+  background: rgba(217, 184, 176, 0.28);
+  font-size: 2rem;
+}
+
+.reader-shelf-book-card h3 {
+  margin: 0 0 6px;
+}
+
+.reader-shelf-book-card p {
+  margin: 5px 0;
+}
+
+.reader-shelf-empty {
+  margin-top: 12px;
+}
+
+@media (max-width: 640px) {
+  .reader-shelf-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .reader-shelf-book-card {
+    grid-template-columns: 72px 1fr;
+  }
+
+  .reader-shelf-book-card img,
+  .reader-shelf-cover-placeholder {
+    width: 72px;
+    min-height: 106px;
+  }
+}

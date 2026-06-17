@@ -142,6 +142,7 @@ function App() {
     const today = new Date()
     return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}`
   })
+  const [yearInBooksKey, setYearInBooksKey] = useState(() => String(new Date().getFullYear()))
   const [analyticsTab, setAnalyticsTab] = useState("overview")
   const [profile, setProfile] = useState(() => {
     const savedProfile = localStorage.getItem("pressedPagesProfile")
@@ -163,6 +164,17 @@ function App() {
         }
   })
   const [profileSavedMessage, setProfileSavedMessage] = useState("")
+  const [cloudProfileId, setCloudProfileId] = useState(null)
+  const [followStats, setFollowStats] = useState({ followers: 0, following: 0, isFollowing: false })
+  const [publicProfileView, setPublicProfileView] = useState(null)
+  const [publicProfileLoading, setPublicProfileLoading] = useState(false)
+  const [publicProfileMessage, setPublicProfileMessage] = useState("")
+  const [activityFeed, setActivityFeed] = useState([])
+  const [activityFeedLoading, setActivityFeedLoading] = useState(false)
+  const [activityFeedMessage, setActivityFeedMessage] = useState("")
+  const [publicProfileBooks, setPublicProfileBooks] = useState([])
+  const [publicProfileShelf, setPublicProfileShelf] = useState("reading")
+  const [profilePreviewShelf, setProfilePreviewShelf] = useState("reading")
 
 
   const [readingGoals, setReadingGoals] = useState(() => {
@@ -205,6 +217,21 @@ function App() {
       ...savedReviews
         .filter((item) => item.bookInfo.status === "Finished" && item.bookInfo.dateFinished)
         .map((item) => String(item.bookInfo.dateFinished).slice(0, 7)),
+    ])
+  )
+    .filter(Boolean)
+    .sort((a, b) => b.localeCompare(a))
+
+  const yearInBooksOptions = Array.from(
+    new Set([
+      yearInBooksKey,
+      String(new Date().getFullYear()),
+      ...savedReviews
+        .filter((item) => item.bookInfo.status === "Finished" && item.bookInfo.dateFinished)
+        .map((item) => String(item.bookInfo.dateFinished).slice(0, 4)),
+      ...getAllReadingLogs()
+        .filter((log) => log.date)
+        .map((log) => String(log.date).slice(0, 4)),
     ])
   )
     .filter(Boolean)
@@ -277,6 +304,10 @@ function App() {
   const currentlyReadingReviews = savedReviews.filter(
     (item) => item.bookInfo.status === "Reading"
   )
+  const tbrReviews = savedReviews.filter(
+    (item) => item.bookInfo.status === "TBR"
+  )
+  const favoriteReviews = savedReviews.filter((item) => item.isFavorite)
 
   const embeddedReadingLogCount = savedReviews.reduce(
     (sum, item) => sum + (item.readingLogs || []).length,
@@ -1882,6 +1913,267 @@ ${review.vibeCheck}`
   }
 
 
+  function getYearInBooksStats(yearKey = yearInBooksKey) {
+    const safeYearKey = String(yearKey || new Date().getFullYear())
+    const books = finishedReviews.filter((item) =>
+      String(item.bookInfo.dateFinished || "").startsWith(safeYearKey)
+    )
+    const logs = getAllReadingLogs().filter((log) =>
+      String(log.date || "").startsWith(safeYearKey)
+    )
+
+    const readingDays = new Set(logs.map((log) => log.date).filter(Boolean)).size
+    const pagesLogged = logs.reduce((sum, log) => sum + Number(log.pagesRead || 0), 0)
+    const minutesLogged = logs.reduce((sum, log) => sum + Number(log.minutesRead || 0), 0)
+
+    const averageRating = books.length
+      ? Math.round((books.reduce((sum, item) => sum + Number(item.bookScore || 0), 0) / books.length) * 10) / 10
+      : 0
+
+    const averageSpice = books.length
+      ? Math.round((books.reduce((sum, item) => sum + Number(item.metrics?.spice || 0), 0) / books.length) * 10) / 10
+      : 0
+
+    const averageObsession = books.length
+      ? Math.round((books.reduce((sum, item) => sum + Number(item.obsessionScore || 0), 0) / books.length) * 10) / 10
+      : 0
+
+    const tropeTotals = {}
+    const authorTotals = {}
+    const formatTotals = {}
+    const monthTotals = {}
+
+    books.forEach((item) => {
+      ;(item.tropes || []).forEach((trope) => {
+        tropeTotals[trope] = (tropeTotals[trope] || 0) + 1
+      })
+
+      const author = item.bookInfo.author || "Unknown Author"
+      authorTotals[author] = (authorTotals[author] || 0) + 1
+
+      const format = item.bookInfo.format || "Unknown Format"
+      formatTotals[format] = (formatTotals[format] || 0) + 1
+
+      const monthKey = String(item.bookInfo.dateFinished || "").slice(0, 7)
+      if (monthKey) monthTotals[monthKey] = (monthTotals[monthKey] || 0) + 1
+    })
+
+    const topTrope = Object.entries(tropeTotals).sort((a, b) => b[1] - a[1])[0] || null
+    const topAuthor = Object.entries(authorTotals).sort((a, b) => b[1] - a[1])[0] || null
+    const topFormat = Object.entries(formatTotals).sort((a, b) => b[1] - a[1])[0] || null
+    const bestMonth = Object.entries(monthTotals).sort((a, b) => b[1] - a[1])[0] || null
+
+    const booksWithDays = books
+      .map((item) => ({ item, days: getDaysToRead(item) }))
+      .filter((entry) => entry.days)
+
+    const fastestRead = [...booksWithDays].sort((a, b) => a.days - b.days)[0] || null
+    const longestRead = [...booksWithDays].sort((a, b) => b.days - a.days)[0] || null
+    const highestRated = [...books].sort((a, b) => Number(b.bookScore || 0) - Number(a.bookScore || 0))[0] || null
+    const brainChemistryReads = books.filter((item) => item.isFavorite)
+    const fiveStarReads = books.filter((item) => Number(item.bookScore || 0) >= 5)
+
+    const monthLabels = Array.from({ length: 12 }, (_, index) => {
+      const date = new Date(Number(safeYearKey), index, 1)
+      const key = `${safeYearKey}-${String(index + 1).padStart(2, "0")}`
+      return {
+        key,
+        shortLabel: date.toLocaleDateString("en-US", { month: "short" }),
+        count: monthTotals[key] || 0,
+      }
+    })
+
+    return {
+      yearKey: safeYearKey,
+      books,
+      booksFinished: books.length,
+      pagesLogged,
+      minutesLogged,
+      hoursLogged: Math.round((minutesLogged / 60) * 10) / 10,
+      readingDays,
+      averageRating,
+      averageSpice,
+      averageObsession,
+      topTrope,
+      topAuthor,
+      topFormat,
+      bestMonth,
+      fastestRead,
+      longestRead,
+      highestRated,
+      brainChemistryReads,
+      fiveStarReads,
+      monthLabels,
+    }
+  }
+
+  function buildYearInBooksGraphicSvg(stats = yearInBooksStats) {
+    const safeStats = stats || {}
+    const width = 1080
+    const height = 1350
+    const favoriteRead =
+      safeStats.highestRated?.bookInfo?.title ||
+      safeStats.brainChemistryReads?.[0]?.bookInfo?.title ||
+      "Add your favorite read"
+    const favoriteAuthor =
+      safeStats.highestRated?.bookInfo?.author ||
+      safeStats.brainChemistryReads?.[0]?.bookInfo?.author ||
+      ""
+    const topTrope = safeStats.topTrope?.[0] || "No trope yet"
+    const topAuthor = safeStats.topAuthor?.[0] || "No author yet"
+    const topFormat = safeStats.topFormat?.[0] || "No format yet"
+    const bestMonthLabel = safeStats.bestMonth
+      ? new Date(Number(String(safeStats.bestMonth[0]).slice(0, 4)), Number(String(safeStats.bestMonth[0]).slice(5, 7)) - 1, 1).toLocaleDateString("en-US", { month: "long" })
+      : "No month yet"
+    const favoriteLines = getWrappedSvgLines(favoriteRead, 25, 2)
+    const maxMonthCount = Math.max(...(safeStats.monthLabels || []).map((month) => month.count), 1)
+    const monthBars = (safeStats.monthLabels || []).map((month, index) => {
+      const barHeight = Math.max(10, Math.round((month.count / maxMonthCount) * 125))
+      const x = 150 + index * 65
+      const y = 1030 - barHeight
+      return `
+        <rect x="${x}" y="${y}" width="34" height="${barHeight}" rx="10" fill="#D9B8B0" opacity="0.86"/>
+        <text x="${x + 17}" y="1065" text-anchor="middle" font-size="20" fill="#7A5D50">${escapeSvgText(month.shortLabel)}</text>
+        <text x="${x + 17}" y="${y - 10}" text-anchor="middle" font-size="18" fill="#4F3B33">${month.count || ""}</text>`
+    }).join("")
+    const topBooks = (safeStats.books || []).slice(0, 5).map((item, index) => {
+      const title = getWrappedSvgLines(item.bookInfo?.title || "Untitled Book", 31, 1)[0]
+      const rating = item.bookScore ? `${item.bookScore}/5` : "unrated"
+      return `<text x="150" y="${1195 + index * 36}" font-size="25" fill="#4F3B33">${index + 1}. ${escapeSvgText(title)} • ${escapeSvgText(rating)}</text>`
+    }).join("") || `<text x="150" y="1195" font-size="25" fill="#4F3B33">No finished books yet</text>`
+
+    return `
+      <svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
+        <defs>
+          <linearGradient id="paperYear" x1="0" x2="1" y1="0" y2="1">
+            <stop offset="0%" stop-color="#FFFDFC"/>
+            <stop offset="55%" stop-color="#F7F1E8"/>
+            <stop offset="100%" stop-color="#EFE3D4"/>
+          </linearGradient>
+          <filter id="yearShadow" x="-20%" y="-20%" width="140%" height="140%">
+            <feDropShadow dx="0" dy="20" stdDeviation="20" flood-color="#4F3B33" flood-opacity="0.18"/>
+          </filter>
+          <pattern id="yearGrid" width="42" height="42" patternUnits="userSpaceOnUse">
+            <path d="M 42 0 L 0 0 0 42" fill="none" stroke="#7A5D50" stroke-opacity="0.08" stroke-width="2"/>
+          </pattern>
+        </defs>
+
+        <rect width="1080" height="1350" fill="#F7F1E8"/>
+        <rect width="1080" height="1350" fill="url(#yearGrid)" opacity="0.75"/>
+        <circle cx="140" cy="140" r="170" fill="#D9B8B0" opacity="0.28"/>
+        <circle cx="940" cy="180" r="145" fill="#A8B29A" opacity="0.30"/>
+        <circle cx="910" cy="1190" r="175" fill="#C8A96A" opacity="0.16"/>
+
+        <rect x="82" y="74" width="916" height="1200" rx="46" fill="url(#paperYear)" stroke="#7A5D50" stroke-opacity="0.28" stroke-width="3" filter="url(#yearShadow)"/>
+        <rect x="410" y="50" width="260" height="52" rx="10" fill="#D9B8B0" opacity="0.72" transform="rotate(-2 540 76)" stroke="#7A5D50" stroke-opacity="0.18"/>
+
+        <text x="540" y="155" text-anchor="middle" font-family="Georgia, serif" font-size="31" letter-spacing="5" fill="#7A5D50">PRESSED PAGES</text>
+        <text x="540" y="235" text-anchor="middle" font-family="Georgia, serif" font-size="76" font-weight="700" fill="#4F3B33">${escapeSvgText(safeStats.yearKey || "Year")}</text>
+        <text x="540" y="286" text-anchor="middle" font-family="Georgia, serif" font-size="32" fill="#7A5D50">Year In Books</text>
+
+        <rect x="130" y="340" width="820" height="165" rx="30" fill="#FFFDFC" stroke="#7A5D50" stroke-opacity="0.22"/>
+        <text x="178" y="398" font-family="Georgia, serif" font-size="29" fill="#7A5D50">FAVORITE READ</text>
+        ${favoriteLines.map((line, index) => `<text x="178" y="${443 + index * 42}" font-family="Georgia, serif" font-size="38" font-weight="700" fill="#4F3B33">${escapeSvgText(line)}</text>`).join("")}
+        ${favoriteAuthor ? `<text x="178" y="484" font-family="Georgia, serif" font-size="26" fill="#7A5D50">by ${escapeSvgText(favoriteAuthor)}</text>` : ""}
+
+        <rect x="130" y="548" width="250" height="130" rx="28" fill="#EFE3D4" stroke="#7A5D50" stroke-opacity="0.18"/>
+        <text x="255" y="596" text-anchor="middle" font-family="Georgia, serif" font-size="24" fill="#7A5D50">BOOKS</text>
+        <text x="255" y="648" text-anchor="middle" font-family="Georgia, serif" font-size="54" font-weight="700" fill="#4F3B33">${safeStats.booksFinished || 0}</text>
+
+        <rect x="415" y="548" width="250" height="130" rx="28" fill="#EFE3D4" stroke="#7A5D50" stroke-opacity="0.18"/>
+        <text x="540" y="596" text-anchor="middle" font-family="Georgia, serif" font-size="24" fill="#7A5D50">PAGES</text>
+        <text x="540" y="648" text-anchor="middle" font-family="Georgia, serif" font-size="54" font-weight="700" fill="#4F3B33">${safeStats.pagesLogged || 0}</text>
+
+        <rect x="700" y="548" width="250" height="130" rx="28" fill="#EFE3D4" stroke="#7A5D50" stroke-opacity="0.18"/>
+        <text x="825" y="596" text-anchor="middle" font-family="Georgia, serif" font-size="24" fill="#7A5D50">READING DAYS</text>
+        <text x="825" y="648" text-anchor="middle" font-family="Georgia, serif" font-size="54" font-weight="700" fill="#4F3B33">${safeStats.readingDays || 0}</text>
+
+        <rect x="130" y="720" width="390" height="190" rx="30" fill="#FFFDFC" stroke="#7A5D50" stroke-opacity="0.22"/>
+        <text x="170" y="775" font-family="Georgia, serif" font-size="27" fill="#7A5D50">YEARLY VIBES</text>
+        <text x="170" y="823" font-family="Georgia, serif" font-size="25" fill="#4F3B33">Avg rating: ${safeStats.averageRating || 0}/5</text>
+        <text x="170" y="860" font-family="Georgia, serif" font-size="25" fill="#4F3B33">Avg spice: ${safeStats.averageSpice || 0}/5</text>
+        <text x="170" y="897" font-family="Georgia, serif" font-size="25" fill="#4F3B33">Avg obsession: ${safeStats.averageObsession || 0}/10</text>
+
+        <rect x="560" y="720" width="390" height="190" rx="30" fill="#FFFDFC" stroke="#7A5D50" stroke-opacity="0.22"/>
+        <text x="600" y="775" font-family="Georgia, serif" font-size="27" fill="#7A5D50">MOST REACHED FOR</text>
+        <text x="600" y="823" font-family="Georgia, serif" font-size="25" fill="#4F3B33">Trope: ${escapeSvgText(topTrope)}</text>
+        <text x="600" y="860" font-family="Georgia, serif" font-size="25" fill="#4F3B33">Author: ${escapeSvgText(topAuthor)}</text>
+        <text x="600" y="897" font-family="Georgia, serif" font-size="25" fill="#4F3B33">Format: ${escapeSvgText(topFormat)}</text>
+
+        <rect x="130" y="950" width="820" height="155" rx="30" fill="#FFFDFC" stroke="#7A5D50" stroke-opacity="0.22"/>
+        <text x="170" y="995" font-family="Georgia, serif" font-size="27" fill="#7A5D50">BOOKS BY MONTH</text>
+        ${monthBars}
+
+        <rect x="130" y="1140" width="820" height="170" rx="30" fill="#FFFDFC" stroke="#7A5D50" stroke-opacity="0.22"/>
+        <text x="170" y="1178" font-family="Georgia, serif" font-size="26" fill="#7A5D50">TOP SHELF</text>
+        ${topBooks}
+        <text x="600" y="1195" font-family="Georgia, serif" font-size="23" fill="#4F3B33">Best month: ${escapeSvgText(bestMonthLabel)}</text>
+        <text x="600" y="1233" font-family="Georgia, serif" font-size="23" fill="#4F3B33">5-star reads: ${safeStats.fiveStarReads?.length || 0}</text>
+        <text x="600" y="1271" font-family="Georgia, serif" font-size="23" fill="#4F3B33">Brain chemistry: ${safeStats.brainChemistryReads?.length || 0}</text>
+
+        <text x="540" y="1325" text-anchor="middle" font-family="Georgia, serif" font-size="25" letter-spacing="3" fill="#7A5D50">READ • RATE • ROMANTICIZE ♡</text>
+      </svg>`
+  }
+
+  function getYearInBooksGraphicDataUrl(stats = yearInBooksStats) {
+    return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(buildYearInBooksGraphicSvg(stats))}`
+  }
+
+  function downloadYearInBooksGraphicSvg(stats = yearInBooksStats) {
+    const safeStats = stats || {}
+    const svg = buildYearInBooksGraphicSvg(safeStats)
+    const blob = new Blob([svg], { type: "image/svg+xml;charset=utf-8" })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement("a")
+    link.href = url
+    link.download = `${getSafeFileName(safeStats.yearKey || "year-in-books")}-year-in-books.svg`
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    URL.revokeObjectURL(url)
+  }
+
+  function downloadYearInBooksGraphicPng(stats = yearInBooksStats) {
+    const safeStats = stats || {}
+    const svg = buildYearInBooksGraphicSvg(safeStats)
+    const svgBlob = new Blob([svg], { type: "image/svg+xml;charset=utf-8" })
+    const svgUrl = URL.createObjectURL(svgBlob)
+    const image = new Image()
+
+    image.onload = () => {
+      const canvas = document.createElement("canvas")
+      canvas.width = 1080
+      canvas.height = 1350
+      const context = canvas.getContext("2d")
+
+      if (!context) {
+        URL.revokeObjectURL(svgUrl)
+        downloadYearInBooksGraphicSvg(safeStats)
+        setSaveMessage("PNG download had trouble, so I downloaded an SVG backup instead.")
+        return
+      }
+
+      context.fillStyle = "#F7F1E8"
+      context.fillRect(0, 0, canvas.width, canvas.height)
+      context.drawImage(image, 0, 0)
+
+      const link = document.createElement("a")
+      link.download = `${getSafeFileName(safeStats.yearKey || "year-in-books")}-year-in-books.png`
+      link.href = canvas.toDataURL("image/png")
+      link.click()
+      URL.revokeObjectURL(svgUrl)
+      setSaveMessage("Year in Books graphic downloaded 🌸")
+    }
+
+    image.onerror = () => {
+      URL.revokeObjectURL(svgUrl)
+      setSaveMessage("PNG download had trouble, so I downloaded an SVG backup instead.")
+      downloadYearInBooksGraphicSvg(safeStats)
+    }
+
+    image.src = svgUrl
+  }
+
 
   function updateProfile(field, value) {
     setProfile({
@@ -1890,9 +2182,67 @@ ${review.vibeCheck}`
     })
   }
 
-  function saveProfile() {
+  function getProfileStatsSnapshot() {
+    return {
+      booksThisYear: yearToDateCount,
+      currentStreak: readingStreakStats.currentStreak,
+      longestStreak: readingStreakStats.longestStreak,
+      averageRating,
+      averageSpice,
+      readingDaysThisYear: readingAnalyticsStats.readingDaysThisYear,
+      unlockedAchievements: achievementStats.unlocked,
+      totalAchievements: achievementStats.total,
+    }
+  }
+
+  async function saveProfileToCloud(profileToSave = profile) {
+    if (!user) return true
+
+    const cleanUsername =
+      (profileToSave.username || user.email?.split("@")[0] || "reader")
+        .replace(/^@+/, "")
+        .trim()
+        .toLowerCase()
+
+    if (!cleanUsername) {
+      setProfileSavedMessage("Add a username before saving your public profile.")
+      return false
+    }
+
+    const { data, error } = await supabase
+      .from("profiles")
+      .upsert({
+        user_id: user.id,
+        username: cleanUsername,
+        display_name: profileToSave.displayName || user.email?.split("@")[0] || "Pressed Pages Reader",
+        avatar_url: profileToSave.avatarUrl || null,
+        is_public: Boolean(profileToSave.isPublicProfile),
+        profile_data: {
+          ...profileToSave,
+          username: cleanUsername,
+        },
+        stats_data: getProfileStatsSnapshot(),
+        updated_at: new Date().toISOString(),
+      }, { onConflict: "user_id" })
+      .select()
+      .single()
+
+    if (error) {
+      setProfileSavedMessage(error.message)
+      return false
+    }
+
+    setCloudProfileId(data.id)
+    return true
+  }
+
+  async function saveProfile() {
     localStorage.setItem("pressedPagesProfile", JSON.stringify(profile))
-    setProfileSavedMessage("Profile saved ✨")
+
+    const savedToCloud = await saveProfileToCloud(profile)
+    if (!savedToCloud) return
+
+    setProfileSavedMessage(user ? "Profile saved and synced ✨" : "Profile saved ✨")
   }
 
   function copyPublicProfileLink() {
@@ -2198,6 +2548,7 @@ ${review.vibeCheck}`
   const readingStreakStats = getReadingStreakStats()
   const readingAnalyticsStats = getReadingAnalyticsStats()
   const monthlyWrapUpStats = getMonthlyWrapUpStats(wrapUpMonthKey)
+  const yearInBooksStats = getYearInBooksStats(yearInBooksKey)
   const readingCalendarStats = getReadingCalendarStats(calendarMonthKey)
   const readingGoalStats = getReadingGoalStats()
   const achievementStats = getAchievementStats()
@@ -2349,6 +2700,11 @@ ${readingProgressPercent}%`
         setSaveMessage(error.message)
         return
       }
+
+      const activityResult = await createActivityEvent(reviewToSave, Boolean(editingReviewId))
+      if (!activityResult?.ok) {
+        return
+      }
     }
 
     setSavedReviews(updatedReviews)
@@ -2388,6 +2744,11 @@ ${readingProgressPercent}%`
 
       if (error) {
         setSaveMessage(error.message)
+        return false
+      }
+
+      const activityResult = await createActivityEvent(changedReview, true)
+      if (!activityResult?.ok) {
         return false
       }
     }
@@ -3028,6 +3389,327 @@ ${percent}%`
     setReadingLogs(cloudReadingLogs)
   }
 
+  async function loadFollowStats(targetUserId, currentUser = user) {
+    if (!targetUserId) return
+
+    const [followersResult, followingResult] = await Promise.all([
+      supabase
+        .from("follows")
+        .select("id", { count: "exact", head: true })
+        .eq("following_id", targetUserId),
+      supabase
+        .from("follows")
+        .select("id", { count: "exact", head: true })
+        .eq("follower_id", targetUserId),
+    ])
+
+    let isFollowing = false
+
+    if (currentUser && currentUser.id !== targetUserId) {
+      const { data } = await supabase
+        .from("follows")
+        .select("id")
+        .eq("follower_id", currentUser.id)
+        .eq("following_id", targetUserId)
+        .maybeSingle()
+
+      isFollowing = Boolean(data)
+    }
+
+    setFollowStats({
+      followers: followersResult.count || 0,
+      following: followingResult.count || 0,
+      isFollowing,
+    })
+  }
+
+  async function loadCloudProfile(currentUser) {
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("*")
+      .eq("user_id", currentUser.id)
+      .maybeSingle()
+
+    if (error) {
+      setProfileSavedMessage(error.message)
+      return
+    }
+
+    if (data) {
+      setCloudProfileId(data.id)
+      const cloudProfile = data.profile_data || {}
+      setProfile({
+        displayName: cloudProfile.displayName || data.display_name || "",
+        username: cloudProfile.username || data.username || "",
+        bio: cloudProfile.bio || "",
+        favoriteGenre: cloudProfile.favoriteGenre || "",
+        favoriteTrope: cloudProfile.favoriteTrope || "",
+        favoriteVibe: cloudProfile.favoriteVibe || "",
+        avatarUrl: cloudProfile.avatarUrl || data.avatar_url || "",
+        readingAesthetic: cloudProfile.readingAesthetic || "",
+        readerType: cloudProfile.readerType || "",
+        favoriteSubgenre: cloudProfile.favoriteSubgenre || "",
+        isPublicProfile: Boolean(cloudProfile.isPublicProfile ?? data.is_public),
+      })
+    }
+
+    await loadFollowStats(currentUser.id, currentUser)
+  }
+
+  async function loadPublicProfileByUsername(username, currentUser = user) {
+    const cleanUsername = String(username || "").replace(/^@+/, "").trim().toLowerCase()
+    if (!cleanUsername) return
+
+    setPublicProfileLoading(true)
+    setPublicProfileMessage("")
+
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("*")
+      .eq("username", cleanUsername)
+      .eq("is_public", true)
+      .maybeSingle()
+
+    if (error) {
+      setPublicProfileMessage(error.message)
+      setPublicProfileView(null)
+      setPublicProfileBooks([])
+      setPublicProfileLoading(false)
+      return
+    }
+
+    if (!data) {
+      setPublicProfileMessage("This public profile could not be found, or it is private.")
+      setPublicProfileView(null)
+      setPublicProfileBooks([])
+      setPublicProfileLoading(false)
+      return
+    }
+
+    setPublicProfileView({
+      userId: data.user_id,
+      username: data.username,
+      displayName: data.display_name,
+      avatarUrl: data.avatar_url,
+      profileData: data.profile_data || {},
+      statsData: data.stats_data || {},
+    })
+
+    const { data: publicReviews, error: publicReviewsError } = await supabase
+      .from("reviews")
+      .select("id, review_data, updated_at")
+      .eq("user_id", data.user_id)
+      .order("updated_at", { ascending: false })
+
+    if (publicReviewsError) {
+      setPublicProfileBooks([])
+      setPublicProfileMessage(`Profile loaded, but shelves could not load: ${publicReviewsError.message}`)
+    } else {
+      setPublicProfileBooks(
+        (publicReviews || [])
+          .map((row) => ({ ...(row.review_data || {}), id: row.id }))
+          .filter((item) => item.bookInfo?.title)
+      )
+    }
+
+    await loadFollowStats(data.user_id, currentUser)
+    setPublicProfileLoading(false)
+  }
+
+  async function toggleFollowPublicProfile() {
+    if (!user) {
+      setPublicProfileMessage("Log in to follow this reader.")
+      return
+    }
+
+    if (!publicProfileView?.userId || publicProfileView.userId === user.id) return
+
+    if (followStats.isFollowing) {
+      const { error } = await supabase
+        .from("follows")
+        .delete()
+        .eq("follower_id", user.id)
+        .eq("following_id", publicProfileView.userId)
+
+      if (error) {
+        setPublicProfileMessage(error.message)
+        return
+      }
+
+      setFollowStats((current) => ({
+        ...current,
+        followers: Math.max(0, Number(current.followers || 0) - 1),
+        isFollowing: false,
+      }))
+      setPublicProfileMessage(`Unfollowed @${publicProfileView.username}.`)
+      return
+    }
+
+    const { error } = await supabase
+      .from("follows")
+      .insert({
+        follower_id: user.id,
+        following_id: publicProfileView.userId,
+      })
+
+    if (error) {
+      setPublicProfileMessage(error.message)
+      return
+    }
+
+    setFollowStats((current) => ({
+      ...current,
+      followers: Number(current.followers || 0) + 1,
+      isFollowing: true,
+    }))
+    setPublicProfileMessage(`Following @${publicProfileView.username} 🌸`)
+  }
+
+  function getActivityTypeForReview(reviewItem, wasEditing = false) {
+    const status = reviewItem?.bookInfo?.status
+
+    if (status === "Finished") return wasEditing ? "updated_finished_book" : "finished_book"
+    if (status === "Reading") return wasEditing ? "updated_current_read" : "started_book"
+    if (status === "TBR") return wasEditing ? "updated_tbr_book" : "added_tbr_book"
+    if (status === "DNF") return wasEditing ? "updated_dnf_book" : "dnf_book"
+
+    return wasEditing ? "updated_book" : "added_book"
+  }
+
+  function getActivityLabel(eventType) {
+    const labels = {
+      finished_book: "finished a book",
+      updated_finished_book: "updated a finished book",
+      started_book: "started reading",
+      updated_current_read: "updated a current read",
+      added_tbr_book: "added a book to TBR",
+      updated_tbr_book: "updated a TBR book",
+      dnf_book: "DNF’d a book",
+      updated_dnf_book: "updated a DNF",
+      added_book: "added a book",
+      updated_book: "updated a book",
+    }
+
+    return labels[eventType] || "shared a reading update"
+  }
+
+  function getActivityIcon(eventType) {
+    if (eventType.includes("finished")) return "✅"
+    if (eventType.includes("started") || eventType.includes("current")) return "📖"
+    if (eventType.includes("tbr")) return "🌙"
+    if (eventType.includes("dnf")) return "🚫"
+    return "🌸"
+  }
+
+  async function createActivityEvent(reviewItem, wasEditing = false) {
+    if (!user || !reviewItem?.id) {
+      const message = "Activity feed error: no logged-in user or review ID was available."
+      setSaveMessage(message)
+      setActivityFeedMessage(message)
+      return { ok: false, error: message }
+    }
+
+    const eventType = getActivityTypeForReview(reviewItem, wasEditing)
+    const eventData = {
+      title: reviewItem.bookInfo?.title || "Untitled Book",
+      author: reviewItem.bookInfo?.author || "Unknown Author",
+      coverUrl: reviewItem.bookInfo?.coverUrl || "",
+      status: reviewItem.bookInfo?.status || "",
+      rating: reviewItem.bookScore || null,
+      spice: reviewItem.metrics?.spice || null,
+      obsession: reviewItem.obsessionScore || null,
+      isFavorite: Boolean(reviewItem.isFavorite),
+      oneSentenceReview: reviewItem.review?.oneSentenceReview || "",
+      dateFinished: reviewItem.bookInfo?.dateFinished || "",
+    }
+
+    const activityPayload = {
+      user_id: user.id,
+      event_type: eventType,
+      book_id: String(reviewItem.id),
+      event_data: eventData,
+    }
+
+    const { error } = await supabase
+      .from("activity_feed")
+      .insert(activityPayload)
+
+    if (error) {
+      const message = `Activity feed error: ${error.message}`
+      console.error(message, error, activityPayload)
+      setActivityFeedMessage(message)
+      setSaveMessage(message)
+      return { ok: false, error: message }
+    }
+
+    await loadActivityFeed(user)
+    return { ok: true }
+  }
+
+  async function loadActivityFeed(currentUser = user) {
+    if (!currentUser) {
+      setActivityFeed([])
+      setActivityFeedMessage("Log in to see your friends’ reading activity.")
+      return
+    }
+
+    setActivityFeedLoading(true)
+    setActivityFeedMessage("")
+
+    const { data: followingRows, error: followingError } = await supabase
+      .from("follows")
+      .select("following_id")
+      .eq("follower_id", currentUser.id)
+
+    if (followingError) {
+      setActivityFeedMessage(followingError.message)
+      setActivityFeedLoading(false)
+      return
+    }
+
+    const followingIds = (followingRows || []).map((row) => row.following_id).filter(Boolean)
+    const feedUserIds = Array.from(new Set([currentUser.id, ...followingIds]))
+
+    if (!feedUserIds.length) {
+      setActivityFeed([])
+      setActivityFeedLoading(false)
+      return
+    }
+
+    const { data: events, error: eventsError } = await supabase
+      .from("activity_feed")
+      .select("*")
+      .in("user_id", feedUserIds)
+      .order("created_at", { ascending: false })
+      .limit(40)
+
+    if (eventsError) {
+      setActivityFeedMessage(eventsError.message)
+      setActivityFeedLoading(false)
+      return
+    }
+
+    const { data: profileRows, error: profilesError } = await supabase
+      .from("profiles")
+      .select("user_id, username, display_name, avatar_url, profile_data")
+      .in("user_id", feedUserIds)
+
+    if (profilesError) {
+      setActivityFeedMessage(profilesError.message)
+    }
+
+    const profileMap = new Map((profileRows || []).map((row) => [row.user_id, row]))
+
+    setActivityFeed(
+      (events || []).map((event) => ({
+        ...event,
+        readerProfile: profileMap.get(event.user_id) || null,
+        isOwnActivity: event.user_id === currentUser.id,
+      }))
+    )
+    setActivityFeedLoading(false)
+  }
+
   async function loadCloudReviews(currentUser) {
     const { data, error } = await supabase
       .from("reviews")
@@ -3058,6 +3740,8 @@ ${percent}%`
     if (user) {
       await loadCloudReviews(user)
       await loadCloudReadingLogs(user)
+      await loadCloudProfile(user)
+      await loadActivityFeed(user)
     } else {
       const saved = localStorage.getItem("brainChemistryBooksReviews")
       setSavedReviews(saved ? JSON.parse(saved) : [])
@@ -3198,6 +3882,123 @@ ${percent}%`
     )
   }
 
+  function getShelfBooks(bookList, shelfType) {
+    const list = Array.isArray(bookList) ? bookList : []
+
+    if (shelfType === "reading") {
+      return list.filter((item) => item.bookInfo?.status === "Reading")
+    }
+
+    if (shelfType === "read") {
+      return list.filter((item) => item.bookInfo?.status === "Finished")
+    }
+
+    if (shelfType === "tbr") {
+      return list.filter((item) => item.bookInfo?.status === "TBR")
+    }
+
+    if (shelfType === "favorites") {
+      return list.filter((item) => item.isFavorite)
+    }
+
+    return list
+  }
+
+  function getShelfStats(bookList) {
+    const list = Array.isArray(bookList) ? bookList : []
+    return {
+      reading: list.filter((item) => item.bookInfo?.status === "Reading").length,
+      read: list.filter((item) => item.bookInfo?.status === "Finished").length,
+      tbr: list.filter((item) => item.bookInfo?.status === "TBR").length,
+      favorites: list.filter((item) => item.isFavorite).length,
+    }
+  }
+
+  function formatShelfDate(dateValue) {
+    if (!dateValue) return ""
+    return new Date(dateValue).toLocaleDateString("en-US", {
+      month: "short",
+      year: "numeric",
+    })
+  }
+
+  function ReaderShelves({ books, activeShelf, onShelfChange, emptyName = "this reader" }) {
+    const shelfStats = getShelfStats(books)
+    const shelfBooks = getShelfBooks(books, activeShelf)
+    const shelfOptions = [
+      { key: "reading", label: "Currently Reading", icon: "📖", count: shelfStats.reading },
+      { key: "read", label: "Read", icon: "📚", count: shelfStats.read },
+      { key: "tbr", label: "Want To Read", icon: "✨", count: shelfStats.tbr },
+      { key: "favorites", label: "Favorites", icon: "❤️", count: shelfStats.favorites },
+    ]
+
+    return (
+      <div className="reader-shelves-panel">
+        <div className="reader-shelves-header">
+          <p>Reader Shelves</p>
+          <h2>Browse the library</h2>
+        </div>
+
+        <div className="reader-shelf-stats">
+          {shelfOptions.map((shelf) => (
+            <button
+              type="button"
+              key={shelf.key}
+              className={activeShelf === shelf.key ? "active" : ""}
+              onClick={() => onShelfChange(shelf.key)}
+            >
+              <span>{shelf.icon}</span>
+              <strong>{shelf.count}</strong>
+              {shelf.label}
+            </button>
+          ))}
+        </div>
+
+        {shelfBooks.length ? (
+          <div className="reader-shelf-grid">
+            {shelfBooks.map((item) => (
+              <div key={item.id} className="reader-shelf-book-card">
+                {item.bookInfo?.coverUrl ? (
+                  <img src={item.bookInfo.coverUrl} alt={`${item.bookInfo.title || "Book"} cover`} />
+                ) : (
+                  <div className="reader-shelf-cover-placeholder">📖</div>
+                )}
+
+                <div>
+                  <h3>{item.bookInfo?.title || "Untitled Book"}</h3>
+                  <p>{item.bookInfo?.author || "Unknown Author"}</p>
+
+                  {item.bookInfo?.status === "Finished" && item.bookScore && (
+                    <p>⭐ {item.bookScore}/5</p>
+                  )}
+
+                  {item.bookInfo?.status === "Finished" && item.bookInfo?.dateFinished && (
+                    <p>Finished {formatShelfDate(item.bookInfo.dateFinished)}</p>
+                  )}
+
+                  {item.bookInfo?.status === "Reading" && (
+                    <p>Reading now{item.bookInfo?.currentPage && item.bookInfo?.totalPages ? ` • page ${item.bookInfo.currentPage}/${item.bookInfo.totalPages}` : ""}</p>
+                  )}
+
+                  {item.bookInfo?.status === "TBR" && (
+                    <p>Waiting on the TBR cart ✨</p>
+                  )}
+
+                  {item.isFavorite && <p>❤️ Favorite</p>}
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="score-card reader-shelf-empty">
+            <p>No books on this shelf yet.</p>
+            <p>{emptyName} hasn’t added anything here.</p>
+          </div>
+        )}
+      </div>
+    )
+  }
+
   useEffect(() => {
     loadUser()
 
@@ -3210,6 +4011,8 @@ ${percent}%`
       if (currentUser) {
         loadCloudReviews(currentUser)
         loadCloudReadingLogs(currentUser)
+        loadCloudProfile(currentUser)
+        loadActivityFeed(currentUser)
       } else {
         const saved = localStorage.getItem("brainChemistryBooksReviews")
         setSavedReviews(saved ? JSON.parse(saved) : [])
@@ -3219,6 +4022,21 @@ ${percent}%`
 
     return () => subscription.unsubscribe()
   }, [])
+
+  useEffect(() => {
+    const pathParts = window.location.pathname.split("/").filter(Boolean)
+
+    if (pathParts[0] === "u" && pathParts[1]) {
+      setStep("publicProfileView")
+      loadPublicProfileByUsername(pathParts[1], user)
+    }
+  }, [user])
+
+  useEffect(() => {
+    if (step === "activityFeed") {
+      loadActivityFeed(user)
+    }
+  }, [step, user])
 
 
   useEffect(() => {
@@ -3266,6 +4084,7 @@ ${percent}%`
           <button onClick={() => setStep("currentlyReading")}>Currently Reading</button>
           <button onClick={() => setStep("library")}>View Library</button>
           <button onClick={() => setStep("analytics")}>Reading Analytics</button>
+          <button onClick={() => setStep("activityFeed")}>Activity Feed</button>
           <button onClick={() => setStep("profile")}>Reader Profile</button>
 
           {savedReviews.length > 0 && (
@@ -3296,6 +4115,85 @@ ${percent}%`
       )}
 
 
+      {step === "activityFeed" && (
+        <section>
+          <p>Friends & Following</p>
+          <h1>Activity Feed</h1>
+          <p>See recent reading updates from you and the readers you follow.</p>
+
+          {activityFeedMessage && <p>{activityFeedMessage}</p>}
+
+          <div className="activity-feed-actions">
+            <button type="button" onClick={() => loadActivityFeed(user)}>Refresh Feed</button>
+            <button type="button" onClick={() => setStep("profile")}>My Profile</button>
+          </div>
+
+          {!user && (
+            <div className="score-card">
+              <p>Log in to see your personalized reading feed.</p>
+            </div>
+          )}
+
+          {user && activityFeedLoading && <p>Loading activity...</p>}
+
+          {user && !activityFeedLoading && activityFeed.length === 0 && (
+            <div className="score-card">
+              <p>🌸 Your feed is quiet for now.</p>
+              <p>Follow a public reader profile or save a book update to start filling this page.</p>
+            </div>
+          )}
+
+          {user && !activityFeedLoading && activityFeed.length > 0 && (
+            <div className="activity-feed-list">
+              {activityFeed.map((event) => {
+                const eventData = event.event_data || {}
+                const reader = event.readerProfile || {}
+                const profileData = reader.profile_data || {}
+                const readerName = profileData.displayName || reader.display_name || reader.username || (event.isOwnActivity ? "You" : "Pressed Pages Reader")
+                const readerUsername = reader.username || "reader"
+                const avatarUrl = profileData.avatarUrl || reader.avatar_url || ""
+
+                return (
+                  <article key={event.id} className="activity-feed-card">
+                    <div className="activity-feed-reader">
+                      <div className="activity-feed-avatar">
+                        {avatarUrl ? <img src={avatarUrl} alt={`${readerName} avatar`} /> : <span>📚</span>}
+                      </div>
+                      <div>
+                        <strong>{event.isOwnActivity ? "You" : readerName}</strong>
+                        {!event.isOwnActivity && <p>@{readerUsername}</p>}
+                        <p>{formatDate(event.created_at)}</p>
+                      </div>
+                    </div>
+
+                    <div className="activity-feed-body">
+                      <p className="activity-feed-type">{getActivityIcon(event.event_type)} {getActivityLabel(event.event_type)}</p>
+                      <div className="activity-feed-book">
+                        {eventData.coverUrl && <img src={eventData.coverUrl} alt={`${eventData.title} cover`} />}
+                        <div>
+                          <h3>{eventData.title || "Untitled Book"}</h3>
+                          <p>{eventData.author || "Unknown Author"}</p>
+                          <p>
+                            {eventData.rating ? `⭐ ${eventData.rating}/5` : ""}
+                            {eventData.spice ? ` • 🌶️ ${eventData.spice}/5` : ""}
+                            {eventData.obsession ? ` • ❤️ ${eventData.obsession}/5` : ""}
+                            {eventData.isFavorite ? " • 🧠 Brain chemistry" : ""}
+                          </p>
+                          {eventData.oneSentenceReview && <p>“{eventData.oneSentenceReview}”</p>}
+                        </div>
+                      </div>
+                    </div>
+                  </article>
+                )
+              })}
+            </div>
+          )}
+
+          <button type="button" onClick={() => setStep("home")}>Back Home</button>
+        </section>
+      )}
+
+
       {step === "profile" && (
         <section>
           <p>Pressed Pages Profile</p>
@@ -3318,6 +4216,10 @@ ${percent}%`
                 <p>Read • Rate • Romanticize</p>
                 <h2>{profileDisplayName}</h2>
                 <p>@{cleanProfileUsername}</p>
+                <div className="follow-count-row">
+                  <span><strong>{followStats.followers}</strong> follower{followStats.followers === 1 ? "" : "s"}</span>
+                  <span><strong>{followStats.following}</strong> following</span>
+                </div>
                 <p>{profile.bio || "Add a little reader bio to make this page feel like yours."}</p>
               </div>
             </div>
@@ -3444,6 +4346,100 @@ ${percent}%`
       )}
 
 
+      {step === "publicProfileView" && (
+        <section>
+          <p>Public Reader Profile</p>
+          <h1>{publicProfileView ? `@${publicProfileView.username}` : "Reader profile"}</h1>
+
+          {publicProfileLoading && <p>Loading public profile...</p>}
+          {publicProfileMessage && <p>{publicProfileMessage}</p>}
+
+          {publicProfileView ? (
+            <>
+              <div className="profile-card public-profile-card">
+                <div className="profile-header">
+                  <div className="profile-avatar">
+                    {(publicProfileView.profileData?.avatarUrl || publicProfileView.avatarUrl) ? (
+                      <img src={publicProfileView.profileData?.avatarUrl || publicProfileView.avatarUrl} alt={`${publicProfileView.displayName || publicProfileView.username} avatar`} />
+                    ) : (
+                      <span>📚</span>
+                    )}
+                  </div>
+
+                  <div>
+                    <p>Read • Rate • Romanticize</p>
+                    <h2>{publicProfileView.profileData?.displayName || publicProfileView.displayName || "Pressed Pages Reader"}</h2>
+                    <p>@{publicProfileView.username}</p>
+                    <div className="follow-count-row">
+                      <span><strong>{followStats.followers}</strong> follower{followStats.followers === 1 ? "" : "s"}</span>
+                      <span><strong>{followStats.following}</strong> following</span>
+                    </div>
+                    <p>{publicProfileView.profileData?.bio || "A Pressed Pages reader romanticizing their reading life."}</p>
+                  </div>
+                </div>
+
+                <div className="profile-banner">
+                  <p>Reader Flair</p>
+                  <div className="profile-flair-row">
+                    <span>{publicProfileView.profileData?.readingAesthetic || "🌸 Scrapbook Reader"}</span>
+                    <span>{publicProfileView.profileData?.readerType || "📚 TBR Collector"}</span>
+                    <span>{publicProfileView.profileData?.favoriteSubgenre || publicProfileView.profileData?.favoriteGenre || "🌾 Romance Reader"}</span>
+                  </div>
+                </div>
+              </div>
+
+              {user && publicProfileView.userId !== user.id && (
+                <button type="button" onClick={toggleFollowPublicProfile}>
+                  {followStats.isFollowing ? "Following ✓" : "Follow Reader"}
+                </button>
+              )}
+
+              {!user && <p>Log in to follow @{publicProfileView.username}.</p>}
+
+              <div className="profile-stats-grid">
+                <div className="score-card">
+                  <p>📚 Books This Year</p>
+                  <h2>{publicProfileView.statsData?.booksThisYear || 0}</h2>
+                </div>
+                <div className="score-card">
+                  <p>🔥 Current Streak</p>
+                  <h2>{publicProfileView.statsData?.currentStreak || 0}</h2>
+                  <p>day{publicProfileView.statsData?.currentStreak === 1 ? "" : "s"}</p>
+                </div>
+                <div className="score-card">
+                  <p>🏆 Longest Streak</p>
+                  <h2>{publicProfileView.statsData?.longestStreak || 0}</h2>
+                  <p>day{publicProfileView.statsData?.longestStreak === 1 ? "" : "s"}</p>
+                </div>
+                <div className="score-card">
+                  <p>⭐ Average Rating</p>
+                  <h2>{publicProfileView.statsData?.averageRating || "0.0"}</h2>
+                  <p>out of 5</p>
+                </div>
+              </div>
+
+              <ReaderShelves
+                books={publicProfileBooks}
+                activeShelf={publicProfileShelf}
+                onShelfChange={setPublicProfileShelf}
+                emptyName={`@${publicProfileView.username}`}
+              />
+
+              <button type="button" onClick={() => setStep("home")}>Back Home</button>
+            </>
+          ) : (
+            !publicProfileLoading && (
+              <div className="score-card">
+                <p>🔒 No public profile loaded.</p>
+                <p>This reader may have turned their profile private.</p>
+                <button type="button" onClick={() => setStep("home")}>Back Home</button>
+              </div>
+            )
+          )}
+        </section>
+      )}
+
+
       {step === "publicProfilePreview" && (
         <section>
           <p>Public Profile Preview</p>
@@ -3501,6 +4497,13 @@ ${percent}%`
                   <p>out of 5</p>
                 </div>
               </div>
+
+              <ReaderShelves
+                books={savedReviews}
+                activeShelf={profilePreviewShelf}
+                onShelfChange={setProfilePreviewShelf}
+                emptyName="you"
+              />
 
               <div className="score-card">
                 <p>🌸 Pressed Petals</p>
@@ -3568,6 +4571,10 @@ ${percent}%`
                 <p>Preview</p>
                 <h2>{profileDisplayName}</h2>
                 <p>@{cleanProfileUsername}</p>
+                <div className="follow-count-row">
+                  <span><strong>{followStats.followers}</strong> follower{followStats.followers === 1 ? "" : "s"}</span>
+                  <span><strong>{followStats.following}</strong> following</span>
+                </div>
                 <p>{profile.bio || "Add a little reader bio to make this page feel like yours."}</p>
               </div>
             </div>
@@ -3730,6 +4737,7 @@ ${percent}%`
             <button type="button" className={analyticsTab === "achievements" ? "active" : ""} onClick={() => setAnalyticsTab("achievements")}>Achievements</button>
             <button type="button" className={analyticsTab === "calendar" ? "active" : ""} onClick={() => setAnalyticsTab("calendar")}>Reading Calendar</button>
             <button type="button" className={analyticsTab === "wrapUps" ? "active" : ""} onClick={() => setAnalyticsTab("wrapUps")}>Wrap-Ups</button>
+            <button type="button" className={analyticsTab === "yearInBooks" ? "active" : ""} onClick={() => setAnalyticsTab("yearInBooks")}>Year In Books</button>
           </div>
 
           <div className={`score-card ${analyticsTab === "goals" ? "" : "analytics-panel-hidden"}`}>
@@ -4077,6 +5085,126 @@ ${percent}%`
               <p>No books finished in this month yet.</p>
             )}
           </div>
+
+          <div className={`score-card ${analyticsTab === "yearInBooks" ? "" : "analytics-panel-hidden"}`}>
+            <p>🌸 Year In Books</p>
+            <h2>{yearInBooksStats.yearKey}</h2>
+            <p>Your yearly scrapbook of finished books, reading days, favorite tropes, and top-shelf reads.</p>
+
+            <div className="review-field">
+              <label>Choose Year</label>
+              <select
+                value={yearInBooksKey}
+                onChange={(e) => setYearInBooksKey(e.target.value)}
+              >
+                {yearInBooksOptions.map((yearOption) => (
+                  <option key={yearOption} value={yearOption}>
+                    {yearOption}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {yearInBooksStats.booksFinished > 0 ? (
+              <>
+                <div className="year-books-hero">
+                  <div>
+                    <strong>{yearInBooksStats.booksFinished}</strong>
+                    <span>Books Finished</span>
+                  </div>
+                  <div>
+                    <strong>{yearInBooksStats.pagesLogged}</strong>
+                    <span>Pages Logged</span>
+                  </div>
+                  <div>
+                    <strong>{yearInBooksStats.readingDays}</strong>
+                    <span>Reading Days</span>
+                  </div>
+                </div>
+
+                <div className="wrapup-graphic-panel">
+                  <img
+                    className="year-books-graphic-preview"
+                    src={getYearInBooksGraphicDataUrl(yearInBooksStats)}
+                    alt={`${yearInBooksStats.yearKey} Pressed Pages Year In Books graphic preview`}
+                  />
+                  <div className="wrapup-graphic-actions">
+                    <button onClick={() => downloadYearInBooksGraphicPng(yearInBooksStats)}>
+                      🎨 Download Year PNG
+                    </button>
+                    <button onClick={() => downloadYearInBooksGraphicSvg(yearInBooksStats)}>
+                      Save SVG Backup
+                    </button>
+                  </div>
+                </div>
+
+                <div className="year-books-grid">
+                  <div>
+                    <p>⭐ Average Rating</p>
+                    <h3>{yearInBooksStats.averageRating}/5</h3>
+                  </div>
+                  <div>
+                    <p>🌶️ Average Spice</p>
+                    <h3>{yearInBooksStats.averageSpice}/5</h3>
+                  </div>
+                  <div>
+                    <p>💘 Average Obsession</p>
+                    <h3>{yearInBooksStats.averageObsession}/10</h3>
+                  </div>
+                  <div>
+                    <p>⏱️ Time Logged</p>
+                    <h3>{yearInBooksStats.hoursLogged} hrs</h3>
+                  </div>
+                </div>
+
+                {yearInBooksStats.topTrope && (
+                  <p>Favorite Trope: {yearInBooksStats.topTrope[0]} ({yearInBooksStats.topTrope[1]})</p>
+                )}
+                {yearInBooksStats.topAuthor && (
+                  <p>Most Read Author: {yearInBooksStats.topAuthor[0]} ({yearInBooksStats.topAuthor[1]})</p>
+                )}
+                {yearInBooksStats.topFormat && (
+                  <p>Most Used Format: {yearInBooksStats.topFormat[0]} ({yearInBooksStats.topFormat[1]})</p>
+                )}
+                {yearInBooksStats.highestRated && (
+                  <p>Highest Rated: {yearInBooksStats.highestRated.bookInfo.title || "Untitled Book"} • {yearInBooksStats.highestRated.bookScore}/5</p>
+                )}
+                {yearInBooksStats.fastestRead && (
+                  <p>Fastest Read: {yearInBooksStats.fastestRead.item.bookInfo.title || "Untitled Book"} • {yearInBooksStats.fastestRead.days} day{yearInBooksStats.fastestRead.days === 1 ? "" : "s"}</p>
+                )}
+                {yearInBooksStats.longestRead && (
+                  <p>Longest Read: {yearInBooksStats.longestRead.item.bookInfo.title || "Untitled Book"} • {yearInBooksStats.longestRead.days} day{yearInBooksStats.longestRead.days === 1 ? "" : "s"}</p>
+                )}
+
+                <div className="year-books-months">
+                  <h3>Books by Month</h3>
+                  {yearInBooksStats.monthLabels.map((month) => (
+                    <div key={month.key}>
+                      <span>{month.shortLabel}</span>
+                      <div className="year-books-month-bar">
+                        <span style={{ width: `${Math.max(4, Math.min(100, (month.count / Math.max(...yearInBooksStats.monthLabels.map((item) => item.count), 1)) * 100))}%` }} />
+                      </div>
+                      <strong>{month.count}</strong>
+                    </div>
+                  ))}
+                </div>
+
+                <div style={{ marginTop: "1rem" }}>
+                  <h3>Finished Shelf</h3>
+                  {yearInBooksStats.books.map((item) => (
+                    <p key={item.id}>
+                      <strong>{item.bookInfo.title || "Untitled Book"}</strong>
+                      {item.bookInfo.author ? ` by ${item.bookInfo.author}` : ""} • {item.bookScore}/5
+                      {item.metrics?.spice ? ` • 🌶️ ${item.metrics.spice}/5` : ""}
+                    </p>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <p>No books finished in this year yet.</p>
+            )}
+          </div>
+
 
           {savedReviews.length > 0 && (
             <div className={`score-card ${analyticsTab === "overview" ? "" : "analytics-panel-hidden"}`}>
