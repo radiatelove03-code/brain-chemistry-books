@@ -123,6 +123,19 @@ function App() {
   const [recommendationLevel, setRecommendationLevel] = useState("Recommend")
   const [isFavorite, setIsFavorite] = useState(false)
   const [saveMessage, setSaveMessage] = useState("")
+  const [alreadyReadBook, setAlreadyReadBook] = useState({
+    title: "",
+    author: "",
+    coverUrl: "",
+    rating: "",
+    dateFinished: "",
+    notes: "",
+  })
+  const [backlogRows, setBacklogRows] = useState([
+    { title: "", author: "", rating: "", dateFinished: "" },
+    { title: "", author: "", rating: "", dateFinished: "" },
+    { title: "", author: "", rating: "", dateFinished: "" },
+  ])
   const [progressInputs, setProgressInputs] = useState({})
   const [readingLogDrafts, setReadingLogDrafts] = useState({})
   const [readingLogDirty, setReadingLogDirty] = useState({})
@@ -326,7 +339,7 @@ function App() {
     finishedReviews.length > 0
       ? (
           finishedReviews.reduce(
-            (sum, item) => sum + Number(item.metrics.spice),
+            (sum, item) => sum + Number(item.metrics?.spice || 0),
             0
           ) / finishedReviews.length
         ).toFixed(1)
@@ -458,6 +471,220 @@ function App() {
     resetForm()
     setSelectedReview(null)
     setStep(0)
+  }
+
+  function openAddBookMenu() {
+    resetForm()
+    setSelectedReview(null)
+    setSaveMessage("")
+    setStep("addBook")
+  }
+
+  function startAlreadyReadBook() {
+    resetForm()
+    setAlreadyReadBook({
+      title: "",
+      author: "",
+      coverUrl: "",
+      rating: "",
+      dateFinished: "",
+      notes: "",
+    })
+    setSaveMessage("")
+    setStep("alreadyRead")
+  }
+
+  function updateAlreadyReadBook(field, value) {
+    setAlreadyReadBook((currentBook) => ({
+      ...currentBook,
+      [field]: value,
+    }))
+  }
+
+  function updateBacklogRow(index, field, value) {
+    setBacklogRows((currentRows) =>
+      currentRows.map((row, rowIndex) =>
+        rowIndex === index ? { ...row, [field]: value } : row
+      )
+    )
+  }
+
+  function addBacklogRow() {
+    setBacklogRows((currentRows) => [
+      ...currentRows,
+      { title: "", author: "", rating: "", dateFinished: "" },
+    ])
+  }
+
+  function removeBacklogRow(index) {
+    setBacklogRows((currentRows) =>
+      currentRows.length === 1
+        ? currentRows
+        : currentRows.filter((_, rowIndex) => rowIndex !== index)
+    )
+  }
+
+  function createBacklogReview(bookData) {
+    const now = new Date().toISOString()
+    const cleanRating = String(bookData.rating || "").trim()
+    const ratingNumber = cleanRating === "" ? null : Number(cleanRating)
+    const safeRating =
+      ratingNumber !== null && !Number.isNaN(ratingNumber)
+        ? Math.min(5, Math.max(0, ratingNumber)).toFixed(1)
+        : null
+
+    const dateFinished = bookData.dateFinished || now
+    const safeNotes = bookData.notes?.trim() || ""
+
+    return {
+      id: crypto.randomUUID(),
+      bookInfo: {
+        title: bookData.title.trim(),
+        author: bookData.author.trim(),
+        coverUrl: bookData.coverUrl || "",
+        series: "",
+        bookNumber: "",
+        genre: "",
+        format: "Kindle",
+        reviewGraphicUrl: "",
+        status: "Finished",
+        totalPages: "",
+        currentPage: "",
+        dateStarted: "",
+        dateFinished,
+      },
+      dnfInfo: null,
+      scores: {
+        plot: safeRating ? Number(safeRating) : 0,
+        vibe: safeRating ? Number(safeRating) : 0,
+        characters: safeRating ? Number(safeRating) : 0,
+        writingStyle: safeRating ? Number(safeRating) : 0,
+        enjoyability: safeRating ? Number(safeRating) : 0,
+      },
+      metrics: {
+        spice: 0,
+        chemistry: 0,
+        tension: 0,
+        emotionalDamage: 0,
+        bookHangover: 0,
+        contentIntensity: 0,
+      },
+      review: safeNotes
+        ? {
+            oneSentenceReview: safeNotes,
+            favoriteThing: "",
+            biggestComplaint: "",
+            vibeCheck: "",
+          }
+        : null,
+      tropes: [],
+      obsessionScore: null,
+      recommendationLevel: safeRating ? "Recommend" : null,
+      isFavorite: false,
+      bookScore: safeRating,
+      miniReviewText: `📚 Already Read\n\n📖 Book:\n${bookData.title.trim()}\n\n✍️ Author:\n${bookData.author.trim()}${
+        safeRating ? `\n\n⭐ Rating:\n${safeRating}/5` : ""
+      }${safeNotes ? `\n\n📝 Notes:\n${safeNotes}` : ""}`,
+      readingLogs: [],
+      savedAt: now,
+      updatedAt: now,
+    }
+  }
+
+  async function saveBacklogReviews(newReviews, successMessage) {
+    const updatedReviews = [...newReviews, ...savedReviews]
+
+    if (user) {
+      const rowsToUpsert = newReviews.map((reviewItem) => ({
+        id: reviewItem.id,
+        user_id: user.id,
+        review_data: reviewItem,
+        updated_at: new Date().toISOString(),
+      }))
+
+      const { error } = await supabase.from("reviews").upsert(rowsToUpsert)
+
+      if (error) {
+        setSaveMessage(error.message)
+        return false
+      }
+
+      for (const reviewItem of newReviews) {
+        const activityResult = await createActivityEvent(reviewItem, false)
+        if (!activityResult?.ok) {
+          return false
+        }
+      }
+    } else {
+      localStorage.setItem(
+        "brainChemistryBooksReviews",
+        JSON.stringify(updatedReviews)
+      )
+    }
+
+    setSavedReviews(updatedReviews)
+    setSaveMessage(successMessage)
+    setStep("library")
+    return true
+  }
+
+  async function saveAlreadyReadBook() {
+    if (!alreadyReadBook.title.trim() || !alreadyReadBook.author.trim()) {
+      setSaveMessage("Add a title and author before saving.")
+      return
+    }
+
+    const reviewToSave = createBacklogReview(alreadyReadBook)
+    const saved = await saveBacklogReviews([reviewToSave], "Already read book added to your Finished shelf ✨")
+
+    if (saved) {
+      setAlreadyReadBook({
+        title: "",
+        author: "",
+        coverUrl: "",
+        rating: "",
+        dateFinished: "",
+        notes: "",
+      })
+    }
+  }
+
+  async function importBacklogBooks() {
+    const validRows = backlogRows
+      .map((row) => ({
+        ...row,
+        title: row.title.trim(),
+        author: row.author.trim(),
+      }))
+      .filter((row) => row.title && row.author)
+
+    const incompleteRows = backlogRows.filter(
+      (row) =>
+        (row.title.trim() || row.author.trim() || row.rating || row.dateFinished) &&
+        (!row.title.trim() || !row.author.trim())
+    )
+
+    if (incompleteRows.length > 0) {
+      setSaveMessage("Every filled row needs both a title and an author.")
+      return
+    }
+
+    if (validRows.length === 0) {
+      setSaveMessage("Add at least one title and author before importing.")
+      return
+    }
+
+    const reviewsToSave = validRows.map((row) => createBacklogReview(row))
+    const successText = `${validRows.length} book${validRows.length === 1 ? "" : "s"} imported to your Finished shelf ✨`
+    const saved = await saveBacklogReviews(reviewsToSave, successText)
+
+    if (saved) {
+      setBacklogRows([
+        { title: "", author: "", rating: "", dateFinished: "" },
+        { title: "", author: "", rating: "", dateFinished: "" },
+        { title: "", author: "", rating: "", dateFinished: "" },
+      ])
+    }
   }
 
   function openSavedReview(reviewItem) {
@@ -4224,6 +4451,9 @@ ${percent}%`
 
   const pageTitles = {
     activityFeed: "Activity Feed",
+    addBook: "Add Book",
+    alreadyRead: "Already Read",
+    backlogImport: "Backlog Import",
     analytics: "Stats",
     currentlyReading: "Currently Reading",
     dnf: "DNF Notes",
@@ -4246,6 +4476,9 @@ ${percent}%`
   function goBackFromPage() {
     const backStepByPage = {
       activityFeed: "home",
+      addBook: "home",
+      alreadyRead: "addBook",
+      backlogImport: "addBook",
       analytics: "home",
       currentlyReading: "home",
       dnf: "library",
@@ -4309,7 +4542,7 @@ ${percent}%`
             tropes, reading goals, and the books worth pressing between the pages.
           </p>
 
-          <button onClick={startNewReview}>Start New Review</button>
+          <button onClick={openAddBookMenu}>Add Book</button>
           <button onClick={() => setStep("currentlyReading")}>Currently Reading</button>
           <button onClick={() => setStep("library")}>View Library</button>
           <button onClick={() => setStep("analytics")}>Reading Analytics</button>
@@ -4340,6 +4573,178 @@ ${percent}%`
               ))}
             </div>
           )}
+        </section>
+      )}
+
+      {step === "addBook" && (
+        <section>
+          <p>Library Management</p>
+          <h1>Add Book</h1>
+          <p>
+            Choose the kind of book entry you want to add. Full reviews are still
+            here, but backlog books can be added without filling out every rating.
+          </p>
+
+          <div className="add-book-choice-grid">
+            <button type="button" className="add-book-choice-card" onClick={startNewReview}>
+              <span>📝</span>
+              <strong>Full Review</strong>
+              <p>Rate the book, track spice, tropes, notes, graphics, and all the scrapbook details.</p>
+            </button>
+
+            <button type="button" className="add-book-choice-card" onClick={() => {
+              resetForm()
+              setBookInfo((currentInfo) => ({
+                ...currentInfo,
+                status: "Reading",
+                dateStarted: currentInfo.dateStarted || new Date().toISOString(),
+              }))
+              setStep(0)
+            }}>
+              <span>📖</span>
+              <strong>Currently Reading</strong>
+              <p>Add a book to your active reading shelf and start tracking page progress.</p>
+            </button>
+
+            <button type="button" className="add-book-choice-card" onClick={startAlreadyReadBook}>
+              <span>📚</span>
+              <strong>Already Read</strong>
+              <p>Quick-add one finished book without writing a full review.</p>
+            </button>
+
+            <button type="button" className="add-book-choice-card" onClick={() => {
+              setSaveMessage("")
+              setStep("backlogImport")
+            }}>
+              <span>📦</span>
+              <strong>Import Multiple</strong>
+              <p>Batch-add older reads to fill your finished shelf faster.</p>
+            </button>
+          </div>
+        </section>
+      )}
+
+      {step === "alreadyRead" && (
+        <section>
+          <p>Quick Add</p>
+          <h1>Already Read</h1>
+          <p>
+            Add a finished book to your library without doing the full review flow.
+            You can always open it later and add more details.
+          </p>
+
+          {saveMessage && <p>{saveMessage}</p>}
+
+          <TextInput
+            label="Title"
+            value={alreadyReadBook.title}
+            onChange={(value) => updateAlreadyReadBook("title", value)}
+          />
+
+          <TextInput
+            label="Author"
+            value={alreadyReadBook.author}
+            onChange={(value) => updateAlreadyReadBook("author", value)}
+          />
+
+          <ImageUpload
+            label="Upload Book Cover"
+            value={alreadyReadBook.coverUrl}
+            onChange={(value) => updateAlreadyReadBook("coverUrl", value)}
+          />
+
+          <TextInput
+            label="Rating /5 optional"
+            value={alreadyReadBook.rating}
+            onChange={(value) => updateAlreadyReadBook("rating", value)}
+          />
+
+          <DateInput
+            label="Date Finished optional"
+            value={alreadyReadBook.dateFinished}
+            onChange={(value) => updateAlreadyReadBook("dateFinished", value)}
+          />
+
+          <label>
+            Notes optional
+            <textarea
+              value={alreadyReadBook.notes}
+              onChange={(event) => updateAlreadyReadBook("notes", event.target.value)}
+              placeholder="Tiny thoughts, memory joggers, or why you added this one..."
+            />
+          </label>
+
+          <div className="library-action-row">
+            <button type="button" onClick={() => setStep("addBook")}>Back</button>
+            <button type="button" onClick={saveAlreadyReadBook}>
+              Add To Finished Shelf
+            </button>
+          </div>
+        </section>
+      )}
+
+      {step === "backlogImport" && (
+        <section>
+          <p>Bulk Add</p>
+          <h1>Backlog Import</h1>
+          <p>
+            Add older finished books in batches. Only title and author are required;
+            rating and date finished are optional.
+          </p>
+
+          {saveMessage && <p>{saveMessage}</p>}
+
+          <div className="backlog-import-panel">
+            <div className="backlog-import-header">
+              <span>Title *</span>
+              <span>Author *</span>
+              <span>Rating</span>
+              <span>Date Finished</span>
+              <span></span>
+            </div>
+
+            {backlogRows.map((row, index) => (
+              <div className="backlog-import-row" key={`backlog-row-${index}`}>
+                <input
+                  value={row.title}
+                  onChange={(event) => updateBacklogRow(index, "title", event.target.value)}
+                  placeholder="Book title"
+                />
+                <input
+                  value={row.author}
+                  onChange={(event) => updateBacklogRow(index, "author", event.target.value)}
+                  placeholder="Author"
+                />
+                <input
+                  value={row.rating}
+                  onChange={(event) => updateBacklogRow(index, "rating", event.target.value)}
+                  placeholder="4.5"
+                />
+                <input
+                  type="date"
+                  value={row.dateFinished}
+                  onChange={(event) => updateBacklogRow(index, "dateFinished", event.target.value)}
+                />
+                <button
+                  type="button"
+                  className="backlog-remove-button"
+                  onClick={() => removeBacklogRow(index)}
+                  disabled={backlogRows.length === 1}
+                  aria-label="Remove row"
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+          </div>
+
+          <div className="library-action-row">
+            <button type="button" onClick={addBacklogRow}>+ Add Row</button>
+            <button type="button" onClick={importBacklogBooks}>
+              Import Books
+            </button>
+            <button type="button" onClick={() => setStep("addBook")}>Back</button>
+          </div>
         </section>
       )}
 
@@ -5912,20 +6317,40 @@ ${percent}%`
             <p>No reviews found for these filters.</p>
           )}
 
-          {filteredReviews.map((item) => (
-            <div className="score-card" key={item.id}>
-              {item.bookInfo.coverUrl && (
-                <img
-                  src={item.bookInfo.coverUrl}
-                  alt="Book cover"
-                  className="book-cover"
-                />
-              )}
+          <div className="library-results-grid">
+            {filteredReviews.map((item) => (
+              <div className="score-card library-book-card" key={item.id}>
+                {item.bookInfo.coverUrl ? (
+                  <button
+                    className="library-cover-button"
+                    onClick={() => openSavedReview(item)}
+                    aria-label={`Open review for ${item.bookInfo.title || "Untitled Book"}`}
+                  >
+                    <img
+                      src={item.bookInfo.coverUrl}
+                      alt={`${item.bookInfo.title || "Book"} cover`}
+                      className="book-cover library-book-cover"
+                    />
+                  </button>
+                ) : (
+                  <button
+                    className="library-cover-button library-cover-placeholder"
+                    onClick={() => openSavedReview(item)}
+                    aria-label={`Open review for ${item.bookInfo.title || "Untitled Book"}`}
+                  >
+                    📖
+                  </button>
+                )}
 
               {item.bookInfo.status === "DNF" ? (
                 <>
                   <p>🚫 DNF</p>
-                  <h2>{item.bookInfo.title || "Untitled Book"}</h2>
+                  <button
+                    className="library-title-button"
+                    onClick={() => openSavedReview(item)}
+                  >
+                    {item.bookInfo.title || "Untitled Book"}
+                  </button>
                   <p>{item.bookInfo.author || "Unknown Author"}</p>
                   <p>{item.bookInfo.format} • {item.bookInfo.status}</p>
                   <p>📍 DNF at {item.dnfInfo?.percent || "?"}%</p>
@@ -5938,7 +6363,12 @@ ${percent}%`
               ) : item.bookInfo.status === "Reading" || item.bookInfo.status === "TBR" ? (
                 <>
                   <p>📖 Currently Reading</p>
-                  <h2>{item.bookInfo.title || "Untitled Book"}</h2>
+                  <button
+                    className="library-title-button"
+                    onClick={() => openSavedReview(item)}
+                  >
+                    {item.bookInfo.title || "Untitled Book"}
+                  </button>
                   <p>{item.bookInfo.author || "Unknown Author"}</p>
                   <p>{item.bookInfo.format} • Reading</p>
                   {item.bookInfo.dateStarted && (
@@ -5949,7 +6379,7 @@ ${percent}%`
                   </p>
                   <ProgressBar percent={getProgressPercent(item.bookInfo)} />
 
-                  <button onClick={() => finishBook(item)}>
+                  <button className="library-action-button" onClick={() => finishBook(item)}>
                     ✅ Finish Book
                   </button>
                 </>
@@ -5957,7 +6387,12 @@ ${percent}%`
                 <>
                   {item.isFavorite && <p>🧠 Brain Chemistry Book</p>}
 
-                  <h2>{item.bookInfo.title || "Untitled Book"}</h2>
+                  <button
+                    className="library-title-button"
+                    onClick={() => openSavedReview(item)}
+                  >
+                    {item.bookInfo.title || "Untitled Book"}
+                  </button>
                   <p>{item.bookInfo.author || "Unknown Author"}</p>
                   <p>{item.bookInfo.format} • {item.bookInfo.status}</p>
                   {item.bookInfo.dateFinished && (
@@ -5977,11 +6412,12 @@ ${percent}%`
                 </>
               )}
 
-              <button onClick={() => openSavedReview(item)}>View Review</button>
-              <button onClick={() => editReview(item)}>Edit Review / Dates</button>
-              <button onClick={() => deleteReview(item.id)}>Delete</button>
+              <button className="library-action-button" onClick={() => openSavedReview(item)}>View Review</button>
+              <button className="library-action-button" onClick={() => editReview(item)}>Edit Review / Dates</button>
+              <button className="library-action-button library-delete-button" onClick={() => deleteReview(item.id)}>Delete</button>
             </div>
-          ))}
+            ))}
+          </div>
 
           <button onClick={() => setStep("home")}>Back Home</button>
         </section>
@@ -6097,7 +6533,7 @@ ${percent}%`
 
               <div className="score-card">
                 <p>Spice Rating</p>
-                <h2>{selectedReview.metrics.spice} / 5</h2>
+                <h2>{selectedReview.metrics?.spice || 0} / 5</h2>
               </div>
 
               <div className="score-card">
