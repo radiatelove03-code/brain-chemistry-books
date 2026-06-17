@@ -362,7 +362,7 @@ function App() {
   const tropeCounts = {}
 
   finishedReviews.forEach((item) => {
-    item.tropes.forEach((trope) => {
+    ;(item.tropes || []).forEach((trope) => {
       tropeCounts[trope] = (tropeCounts[trope] || 0) + 1
     })
   })
