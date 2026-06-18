@@ -1487,9 +1487,15 @@ ${review.vibeCheck}`
   }
 
   function getAllReadingLogs() {
+    const safeReviews = Array.isArray(savedReviews) ? savedReviews : []
+    const safeReadingLogs = Array.isArray(readingLogs) ? readingLogs : []
+    const titleByBookId = new Map(
+      safeReviews.map((item) => [item.id, item.bookInfo?.title || "Untitled Book"])
+    )
+
     if (user) {
-      const cloudBookIds = new Set(readingLogs.map((log) => log.bookId))
-      const embeddedLogsWithoutCloudCopies = savedReviews.flatMap((item) => {
+      const cloudBookIds = new Set(safeReadingLogs.map((log) => log.bookId))
+      const embeddedLogsWithoutCloudCopies = safeReviews.flatMap((item) => {
         if (cloudBookIds.has(item.id)) return []
 
         return (item.readingLogs || []).map((log) => ({
@@ -1499,18 +1505,15 @@ ${review.vibeCheck}`
         }))
       })
 
-      const cloudLogs = readingLogs.map((log) => {
-        const book = savedReviews.find((item) => item.id === log.bookId)
-        return {
-          ...log,
-          title: book?.bookInfo?.title || "Untitled Book",
-        }
-      })
+      const cloudLogs = safeReadingLogs.map((log) => ({
+        ...log,
+        title: titleByBookId.get(log.bookId) || "Untitled Book",
+      }))
 
       return [...cloudLogs, ...embeddedLogsWithoutCloudCopies]
     }
 
-    return savedReviews.flatMap((item) =>
+    return safeReviews.flatMap((item) =>
       (item.readingLogs || []).map((log) => ({
         ...log,
         bookId: item.id,
@@ -3316,13 +3319,31 @@ ${review.vibeCheck}`
     }
   }
 
+  const shouldComputeFullStats = [
+    "analytics",
+    "profile",
+    "editProfile",
+    "publicProfilePreview",
+  ].includes(step)
+
+  const emptyAchievementStats = { groups: [], total: 0, unlocked: 0, nextAchievement: null }
+  const emptyReadingCalendarStats = {
+    monthLabel: "",
+    calendarDays: [],
+    selectedDay: null,
+    totalDaysRead: 0,
+    totalPages: 0,
+    totalMinutes: 0,
+    totalHours: 0,
+  }
+
   const readingStreakStats = getReadingStreakStats()
-  const readingAnalyticsStats = getReadingAnalyticsStats()
-  const monthlyWrapUpStats = getMonthlyWrapUpStats(wrapUpMonthKey)
-  const yearInBooksStats = getYearInBooksStats(yearInBooksKey)
-  const readingCalendarStats = getReadingCalendarStats(calendarMonthKey)
-  const readingGoalStats = getReadingGoalStats()
-  const achievementStats = getAchievementStats()
+  const readingAnalyticsStats = shouldComputeFullStats ? getReadingAnalyticsStats() : {}
+  const monthlyWrapUpStats = shouldComputeFullStats ? getMonthlyWrapUpStats(wrapUpMonthKey) : {}
+  const yearInBooksStats = shouldComputeFullStats ? getYearInBooksStats(yearInBooksKey) : {}
+  const readingCalendarStats = shouldComputeFullStats ? getReadingCalendarStats(calendarMonthKey) : emptyReadingCalendarStats
+  const readingGoalStats = shouldComputeFullStats ? getReadingGoalStats() : { currentYearKey: String(new Date().getFullYear()) }
+  const achievementStats = shouldComputeFullStats ? getAchievementStats() : emptyAchievementStats
 
   const profileDisplayName =
     profile.displayName || user?.email?.split("@")[0] || "Pressed Pages Reader"
@@ -4654,10 +4675,9 @@ ${percent}%`
     setUser(user)
 
     if (user) {
-      await loadCloudReviews(user)
-      await loadCloudReadingLogs(user)
-      await loadCloudProfile(user)
-      await loadActivityFeed(user)
+      await Promise.all([loadCloudReviews(user), loadCloudReadingLogs(user)])
+      loadCloudProfile(user)
+      if (step === "activityFeed") loadActivityFeed(user)
     } else {
       setSavedReviews(loadLocalSavedReviews())
       setReadingLogs([])
@@ -4882,8 +4902,6 @@ ${percent}%`
         loadCloudReviews(currentUser)
         loadCloudReadingLogs(currentUser)
         loadCloudProfile(currentUser)
-        loadActivityFeed(currentUser)
-        loadCommunityChallengeParticipation(currentUser)
       } else {
         setSavedReviews(loadLocalSavedReviews())
         setReadingLogs([])
@@ -4911,16 +4929,18 @@ ${percent}%`
 
 
   useEffect(() => {
-    if (user) {
+    if (user && step === "communityChallenges") {
       loadCommunityChallengeParticipation(user)
       return
     }
 
-    localStorage.setItem(
-      "pressedPagesJoinedCommunityChallenges",
-      JSON.stringify(Array.isArray(joinedCommunityChallengeIds) ? joinedCommunityChallengeIds : [])
-    )
-  }, [user, savedReviews])
+    if (!user) {
+      localStorage.setItem(
+        "pressedPagesJoinedCommunityChallenges",
+        JSON.stringify(Array.isArray(joinedCommunityChallengeIds) ? joinedCommunityChallengeIds : [])
+      )
+    }
+  }, [user, step])
 
 
   useEffect(() => {
