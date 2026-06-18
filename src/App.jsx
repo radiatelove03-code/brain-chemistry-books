@@ -213,6 +213,17 @@ function App() {
     }
   }
 
+  function isReviewOwnedByCurrentUser(reviewItem) {
+    const safeReviewItem = normalizeReviewForDisplay(reviewItem)
+
+    if (!safeReviewItem?.id) return false
+
+    // Local-only reviews may not have user_id yet, but they only exist in the owner's library.
+    if (!safeReviewItem.user_id) return true
+
+    return Boolean(user?.id && safeReviewItem.user_id === user.id)
+  }
+
   function loadLocalSavedReviews() {
     try {
       const saved = localStorage.getItem("brainChemistryBooksReviews")
@@ -386,7 +397,7 @@ function App() {
   const libraryFinishedYears = Array.from(
     new Set(
       savedReviews
-        .filter((item) => item.bookInfo.status === "Finished" && item.bookInfo.dateFinished)
+        .filter((item) => item.bookInfo?.status === "Finished" && item.bookInfo.dateFinished)
         .map((item) => new Date(item.bookInfo.dateFinished).getFullYear())
         .filter((year) => !Number.isNaN(year))
     )
@@ -396,7 +407,7 @@ function App() {
     new Set([
       wrapUpMonthKey,
       ...savedReviews
-        .filter((item) => item.bookInfo.status === "Finished" && item.bookInfo.dateFinished)
+        .filter((item) => item.bookInfo?.status === "Finished" && item.bookInfo.dateFinished)
         .map((item) => String(item.bookInfo.dateFinished).slice(0, 7)),
     ])
   )
@@ -408,7 +419,7 @@ function App() {
       yearInBooksKey,
       String(new Date().getFullYear()),
       ...savedReviews
-        .filter((item) => item.bookInfo.status === "Finished" && item.bookInfo.dateFinished)
+        .filter((item) => item.bookInfo?.status === "Finished" && item.bookInfo.dateFinished)
         .map((item) => String(item.bookInfo.dateFinished).slice(0, 4)),
       ...getAllReadingLogs()
         .filter((log) => log.date)
@@ -657,7 +668,7 @@ const filteredReviews = useMemo(() => {
     reviewRows.forEach((row) => {
       if (!row?.user_id) return
       if (!reviewsByUserId[row.user_id]) reviewsByUserId[row.user_id] = []
-      reviewsByUserId[row.user_id].push({ ...(row.review_data || {}), id: row.review_data?.id || row.id })
+      reviewsByUserId[row.user_id].push({ ...(row.review_data || {}), id: row.review_data?.id || row.id, user_id: row.user_id })
     })
 
     if (currentUser?.id) {
@@ -862,24 +873,28 @@ const filteredReviews = useMemo(() => {
   const totalBooks = savedReviews.length
  const finishedReviews = useMemo(() => {
   return savedReviews.filter(
-    (item) => item.bookInfo.status === "Finished"
+    (item) => item.bookInfo?.status === "Finished"
   )
 }, [savedReviews])
   const dnfReviews = useMemo(() => {
   return savedReviews.filter(
-    (item) => item.bookInfo.status === "DNF"
+    (item) => item.bookInfo?.status === "DNF"
   )
 }, [savedReviews])
 
-  const currentlyReadingReviews = savedReviews.filter(
-    (item) => item.bookInfo.status === "Reading"
-  )
+  const currentlyReadingReviews = useMemo(() => {
+    return savedReviews.filter(
+      (item) => item.bookInfo?.status === "Reading"
+    )
+  }, [savedReviews])
   const tbrReviews = useMemo(() => {
   return savedReviews.filter(
-    (item) => item.bookInfo.status === "TBR"
+    (item) => item.bookInfo?.status === "TBR"
   )
 }, [savedReviews])
-  const favoriteReviews = savedReviews.filter((item) => item.isFavorite)
+  const favoriteReviews = useMemo(() => {
+    return savedReviews.filter((item) => item.isFavorite)
+  }, [savedReviews])
 
   const embeddedReadingLogCount = savedReviews.reduce(
     (sum, item) => sum + (item.readingLogs || []).length,
@@ -1248,6 +1263,13 @@ const filteredReviews = useMemo(() => {
   }
 
   async function deleteReview(reviewId) {
+    const reviewToDelete = savedReviews.find((item) => item.id === reviewId) || selectedReview
+
+    if (!isReviewOwnedByCurrentUser(reviewToDelete)) {
+      setSaveMessage("You can only delete reviews from your own library.")
+      return
+    }
+
     const confirmed = window.confirm("Delete this review?")
     if (!confirmed) return
 
@@ -1347,6 +1369,11 @@ const filteredReviews = useMemo(() => {
 
   function editReview(reviewItem) {
     const safeReviewItem = normalizeReviewForDisplay(reviewItem)
+
+    if (!isReviewOwnedByCurrentUser(safeReviewItem)) {
+      setSaveMessage("You can only edit reviews from your own library.")
+      return
+    }
 
     setBookInfo(safeReviewItem.bookInfo)
 
@@ -3376,6 +3403,7 @@ const yearInBooksStats = useMemo(() => {
 const achievementStats = useMemo(() => {
   return shouldComputeFullStats ? getAchievementStats() : emptyAchievementStats
 }, [shouldComputeFullStats, savedReviews, readingStreakStats])
+  const isSelectedReviewOwner = selectedReview ? isReviewOwnedByCurrentUser(selectedReview) : false
   const profileDisplayName =
     profile.displayName || user?.email?.split("@")[0] || "Pressed Pages Reader"
   const cleanProfileUsername =
@@ -4393,7 +4421,7 @@ ${percent}%`
     } else {
       setPublicProfileBooks(
         (publicReviews || [])
-          .map((row) => ({ ...(row.review_data || {}), id: row.id }))
+          .map((row) => ({ ...(row.review_data || {}), id: row.id, user_id: data.user_id }))
           .filter((item) => item.bookInfo?.title)
       )
     }
@@ -7125,9 +7153,11 @@ ${percent}%`
                 </p>
                 <ProgressBar percent={getProgressPercent(selectedReview.bookInfo)} />
 
-                <button onClick={() => finishBook(selectedReview)}>
-                  ✅ Finish Book
-                </button>
+                {isSelectedReviewOwner && (
+                  <button onClick={() => finishBook(selectedReview)}>
+                    ✅ Finish Book
+                  </button>
+                )}
               </div>
 
               <div className="score-card">
@@ -7231,17 +7261,22 @@ ${percent}%`
             </>
           )}
 
-          {selectedReview.bookInfo.status === "Finished" && (
+          {isSelectedReviewOwner && selectedReview.bookInfo.status === "Finished" && (
             <button onClick={() => setStep("reviewGraphic")}>
               🎨 Generate Review Graphic
             </button>
           )}
 
           <button onClick={() => setStep("library")}>Back to Library</button>
-          <button onClick={() => editReview(selectedReview)}>Edit Review / Dates</button>
-          <button onClick={() => deleteReview(selectedReview.id)}>
-            Delete Review
-          </button>
+
+          {isSelectedReviewOwner && (
+            <>
+              <button onClick={() => editReview(selectedReview)}>Edit Review / Dates</button>
+              <button onClick={() => deleteReview(selectedReview.id)}>
+                Delete Review
+              </button>
+            </>
+          )}
         </section>
       )}
 
