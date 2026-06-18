@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { supabase } from "./lib/supabase"
 import Auth from "./Auth"
 import "./App.css"
@@ -422,7 +422,8 @@ function App() {
     new Set(savedReviews.flatMap((item) => item?.tropes || []))
   ).sort()
 
-  const filteredReviews = savedReviews.filter((item) => {
+const filteredReviews = useMemo(() => {
+  return savedReviews.filter((item) => {
     const book = item?.bookInfo || {}
     const status = book.status || ""
 
@@ -465,7 +466,16 @@ function App() {
 
     return true
   })
-
+}, [
+  savedReviews,
+  libraryFilter,
+  librarySearch,
+  libraryRatingFilter,
+  librarySpiceFilter,
+  libraryFinishedYearFilter,
+  libraryFinishedMonthFilter,
+  libraryTropeFilter,
+])
 
   const joinedCommunityChallengeSet = new Set(
     Array.isArray(joinedCommunityChallengeIds) ? joinedCommunityChallengeIds : []
@@ -850,18 +860,25 @@ function App() {
   }
 
   const totalBooks = savedReviews.length
-  const finishedReviews = savedReviews.filter(
+ const finishedReviews = useMemo(() => {
+  return savedReviews.filter(
     (item) => item.bookInfo.status === "Finished"
   )
-  const dnfReviews = savedReviews.filter(
+}, [savedReviews])
+  const dnfReviews = useMemo(() => {
+  return savedReviews.filter(
     (item) => item.bookInfo.status === "DNF"
   )
+}, [savedReviews])
+
   const currentlyReadingReviews = savedReviews.filter(
     (item) => item.bookInfo.status === "Reading"
   )
-  const tbrReviews = savedReviews.filter(
+  const tbrReviews = useMemo(() => {
+  return savedReviews.filter(
     (item) => item.bookInfo.status === "TBR"
   )
+}, [savedReviews])
   const favoriteReviews = savedReviews.filter((item) => item.isFavorite)
 
   const embeddedReadingLogCount = savedReviews.reduce(
@@ -1521,6 +1538,9 @@ ${review.vibeCheck}`
       }))
     )
   }
+const allReadingLogs = useMemo(() => {
+  return getAllReadingLogs()
+}, [savedReviews, readingLogs, user])
 
 
   function updateReadingGoal(field, value) {
@@ -1540,7 +1560,7 @@ ${review.vibeCheck}`
   }
 
   function getReadingGoalStats() {
-    const logs = getAllReadingLogs()
+    const logs = allReadingLogs
     const currentYearKey = String(new Date().getFullYear())
     const logsThisYear = logs.filter((log) => (log.date || "").startsWith(currentYearKey))
     const readingDaysThisYear = new Set(
@@ -2149,7 +2169,7 @@ ${review.vibeCheck}`
   }
 
   function getReadingStreakStats() {
-    const logs = getAllReadingLogs()
+    const logs = allReadingLogs
     const logsByDate = {}
 
     logs.forEach((log) => {
@@ -2232,7 +2252,7 @@ ${review.vibeCheck}`
     const firstDay = new Date(year, month - 1, 1)
     const daysInMonth = new Date(year, month, 0).getDate()
     const startingWeekday = firstDay.getDay()
-    const logs = getAllReadingLogs()
+    const logs = allReadingLogs
 
     const bookTitleById = savedReviews.reduce((lookup, item) => {
       lookup[item.id] = item.bookInfo?.title || "Untitled Book"
@@ -2309,7 +2329,7 @@ ${review.vibeCheck}`
   }
 
   function getReadingAnalyticsStats() {
-    const logs = getAllReadingLogs()
+    const logs = allReadingLogs
     const today = new Date()
     const currentYearKey = String(today.getFullYear())
     const currentMonthKey = getLocalDateKey(today).slice(0, 7)
@@ -2441,7 +2461,7 @@ ${review.vibeCheck}`
       String(item.bookInfo.dateFinished || "").startsWith(safeMonthKey)
     )
 
-    const logs = getAllReadingLogs().filter((log) =>
+    const logs = allReadingLogs.filter((log) =>
       String(log.date || "").startsWith(safeMonthKey)
     )
 
@@ -2687,7 +2707,7 @@ ${review.vibeCheck}`
     const books = finishedReviews.filter((item) =>
       String(item.bookInfo.dateFinished || "").startsWith(safeYearKey)
     )
-    const logs = getAllReadingLogs().filter((log) =>
+    const logs = allReadingLogs.filter((log) =>
       String(log.date || "").startsWith(safeYearKey)
     )
 
@@ -3337,14 +3357,25 @@ ${review.vibeCheck}`
     totalHours: 0,
   }
 
-  const readingStreakStats = getReadingStreakStats()
+  const readingStreakStats = useMemo(() => {
+  return getReadingStreakStats()
+}, [savedReviews])
   const readingAnalyticsStats = shouldComputeFullStats ? getReadingAnalyticsStats() : {}
-  const monthlyWrapUpStats = shouldComputeFullStats ? getMonthlyWrapUpStats(wrapUpMonthKey) : {}
-  const yearInBooksStats = shouldComputeFullStats ? getYearInBooksStats(yearInBooksKey) : {}
+const monthlyWrapUpStats = useMemo(() => {
+  return shouldComputeFullStats
+    ? getMonthlyWrapUpStats(wrapUpMonthKey)
+    : {}
+}, [shouldComputeFullStats, wrapUpMonthKey, savedReviews])
+const yearInBooksStats = useMemo(() => {
+  return shouldComputeFullStats
+    ? getYearInBooksStats(yearInBooksKey)
+    : {}
+}, [shouldComputeFullStats, yearInBooksKey, finishedReviews, savedReviews])
   const readingCalendarStats = shouldComputeFullStats ? getReadingCalendarStats(calendarMonthKey) : emptyReadingCalendarStats
   const readingGoalStats = shouldComputeFullStats ? getReadingGoalStats() : { currentYearKey: String(new Date().getFullYear()) }
-  const achievementStats = shouldComputeFullStats ? getAchievementStats() : emptyAchievementStats
-
+const achievementStats = useMemo(() => {
+  return shouldComputeFullStats ? getAchievementStats() : emptyAchievementStats
+}, [shouldComputeFullStats, savedReviews, readingStreakStats])
   const profileDisplayName =
     profile.displayName || user?.email?.split("@")[0] || "Pressed Pages Reader"
   const cleanProfileUsername =
@@ -4686,7 +4717,7 @@ ${percent}%`
   }
 
   function getReadingHeatMapStats(daysBack = 90) {
-    const logs = getAllReadingLogs()
+    const logs = allReadingLogs
     const logsByDate = {}
 
     logs.forEach((log) => {
