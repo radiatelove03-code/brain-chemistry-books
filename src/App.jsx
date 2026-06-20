@@ -21,6 +21,10 @@ import LibraryPage from "./components/LibraryPage"
 import HomePage from "./components/HomePage"
 import CurrentlyReadingPage from "./components/CurrentlyReadingPage"
 import ReadingLogPage from "./components/ReadingLogPage"
+import PublicProfilePreviewPage from "./components/PublicProfilePreviewPage"
+import ReaderShelves from "./components/ReaderShelves"
+import AnalyticsPage from "./components/AnalyticsPage"
+import AddBookPage from "./components/AddBookPage"
 
 const tropeOptions = [
   "Small Town",
@@ -4939,90 +4943,6 @@ loadFollowStats(currentUser.id, currentUser)
   }
 
 
-  
-  function ReaderShelves({ books, activeShelf, onShelfChange, emptyName = "this reader", onOpenBook }) {
-    const shelfStats = getShelfStats(books)
-    const shelfBooks = getShelfBooks(books, activeShelf)
-    const shelfOptions = [
-      { key: "reading", label: "Currently Reading", icon: "📖", count: shelfStats.reading },
-      { key: "read", label: "Read", icon: "📚", count: shelfStats.read },
-      { key: "tbr", label: "Want To Read", icon: "✨", count: shelfStats.tbr },
-      { key: "favorites", label: "Favorites", icon: "❤️", count: shelfStats.favorites },
-    ]
-
-    return (
-      <div className="reader-shelves-panel">
-        <div className="reader-shelves-header">
-          <p>Reader Shelves</p>
-          <h2>Browse the library</h2>
-        </div>
-
-        <div className="reader-shelf-stats">
-          {shelfOptions.map((shelf) => (
-            <button
-              type="button"
-              key={shelf.key}
-              className={activeShelf === shelf.key ? "active" : ""}
-              onClick={() => onShelfChange(shelf.key)}
-            >
-              <span>{shelf.icon}</span>
-              <strong>{shelf.count}</strong>
-              {shelf.label}
-            </button>
-          ))}
-        </div>
-
-        {shelfBooks.length ? (
-          <div className="reader-shelf-grid">
-            {shelfBooks.map((item) => (
-              <button
-                type="button"
-                key={item.id}
-                className="reader-shelf-book-card reader-shelf-book-button"
-                onClick={() => onOpenBook?.(item)}
-                aria-label={`Open ${item.bookInfo?.title || "book"} review`}
-              >
-                {item.bookInfo?.coverUrl ? (
-                  <img src={item.bookInfo.coverUrl} alt={`${item.bookInfo.title || "Book"} cover`} />
-                ) : (
-                  <div className="reader-shelf-cover-placeholder">📖</div>
-                )}
-
-                <div>
-                  <h3>{item.bookInfo?.title || "Untitled Book"}</h3>
-                  <p>{item.bookInfo?.author || "Unknown Author"}</p>
-
-                  {item.bookInfo?.status === "Finished" && item.bookScore && (
-                    <p>⭐ {item.bookScore}/5</p>
-                  )}
-
-                  {item.bookInfo?.status === "Finished" && item.bookInfo?.dateFinished && (
-                    <p>Finished {formatShelfDate(item.bookInfo.dateFinished)}</p>
-                  )}
-
-                  {item.bookInfo?.status === "Reading" && (
-                    <p>Reading now{item.bookInfo?.currentPage && item.bookInfo?.totalPages ? ` • page ${item.bookInfo.currentPage}/${item.bookInfo.totalPages}` : ""}</p>
-                  )}
-
-                  {item.bookInfo?.status === "TBR" && (
-                    <p>Waiting on the TBR cart ✨</p>
-                  )}
-
-                  {item.isFavorite && <p>❤️ Favorite</p>}
-                </div>
-              </button>
-            ))}
-          </div>
-        ) : (
-          <div className="score-card reader-shelf-empty">
-            <p>No books on this shelf yet.</p>
-            <p>{emptyName} hasn’t added anything here.</p>
-          </div>
-        )}
-      </div>
-    )
-  }
-
  useEffect(() => {
   loadUser()
 
@@ -5166,53 +5086,16 @@ loadFollowStats(currentUser.id, currentUser)
   />
 )}
 
-      {step === "addBook" && (
-        <section>
-          <p>Library Management</p>
-          <h1>Add Book</h1>
-          <p>
-            Choose the kind of book entry you want to add. Full reviews are still
-            here, but backlog books can be added without filling out every rating.
-          </p>
-
-          <div className="add-book-choice-grid">
-            <button type="button" className="add-book-choice-card" onClick={startNewReview}>
-              <span>📝</span>
-              <strong>Full Review</strong>
-              <p>Rate the book, track spice, tropes, notes, graphics, and all the scrapbook details.</p>
-            </button>
-
-            <button type="button" className="add-book-choice-card" onClick={() => {
-              resetForm()
-              setBookInfo((currentInfo) => ({
-                ...currentInfo,
-                status: "Reading",
-                dateStarted: currentInfo.dateStarted || new Date().toISOString(),
-              }))
-              setStep(0)
-            }}>
-              <span>📖</span>
-              <strong>Currently Reading</strong>
-              <p>Add a book to your active reading shelf and start tracking page progress.</p>
-            </button>
-
-            <button type="button" className="add-book-choice-card" onClick={startAlreadyReadBook}>
-              <span>📚</span>
-              <strong>Already Read</strong>
-              <p>Quick-add one finished book without writing a full review.</p>
-            </button>
-
-            <button type="button" className="add-book-choice-card" onClick={() => {
-              setSaveMessage("")
-              setStep("backlogImport")
-            }}>
-              <span>📦</span>
-              <strong>Import Multiple</strong>
-              <p>Batch-add older reads to fill your finished shelf faster.</p>
-            </button>
-          </div>
-        </section>
-      )}
+    {step === "addBook" && (
+  <AddBookPage
+    startNewReview={startNewReview}
+    resetForm={resetForm}
+    setBookInfo={setBookInfo}
+    startAlreadyReadBook={startAlreadyReadBook}
+    setSaveMessage={setSaveMessage}
+    setStep={setStep}
+  />
+)}
 
       {step === "alreadyRead" && (
         <section>
@@ -5425,113 +5308,28 @@ loadFollowStats(currentUser.id, currentUser)
 
 
       {step === "publicProfilePreview" && (
-        <section>
-          <p>Public Profile Preview</p>
-          <h1>@{cleanProfileUsername}</h1>
-          <p>This is the shareable version of your reader scrapbook.</p>
-
-          {profile.isPublicProfile ? (
-            <>
-              <ReaderCard
-                reader={{
-                  username: cleanProfileUsername,
-                  displayName: profileDisplayName,
-                  avatarUrl: profile.avatarUrl,
-                  profileData: {
-                    ...profile,
-                    readingAesthetic: profileReadingAesthetic,
-                    readerType: profileReaderType,
-                    favoriteSubgenre: profileFavoriteSubgenre,
-                  },
-                }}
-                stats={{ booksThisYear: yearToDateCount }}
-                followStats={followStats}
-              />
-
-              <div className="profile-stats-grid">
-                <div className="score-card">
-                  <p>📚 Books This Year</p>
-                  <h2>{yearToDateCount}</h2>
-                </div>
-                <div className="score-card">
-                  <p>🔥 Current Streak</p>
-                  <h2>{readingStreakStats.currentStreak}</h2>
-                  <p>day{readingStreakStats.currentStreak === 1 ? "" : "s"}</p>
-                </div>
-                <div className="score-card">
-                  <p>🏆 Longest Streak</p>
-                  <h2>{readingStreakStats.longestStreak}</h2>
-                  <p>day{readingStreakStats.longestStreak === 1 ? "" : "s"}</p>
-                </div>
-                <div className="score-card">
-                  <p>⭐ Average Rating</p>
-                  <h2>{averageRating}</h2>
-                  <p>out of 5</p>
-                </div>
-              </div>
-
-              <ReaderShelves
-                books={savedReviews}
-                activeShelf={profilePreviewShelf}
-                onShelfChange={setProfilePreviewShelf}
-                emptyName="you"
-                onOpenBook={openSavedReview}
-              />
-
-              <div className="score-card">
-                <p>🌸 Pressed Petals</p>
-                <p>A bloom for every day spent reading.</p>
-                <ReadingHeatMap
-                  heatMapStats={getReadingHeatMapStats(90)}
-                  compact
-                  formatDateKey={formatDateKey}
-                  />
-              </div>
-
-              <div className="score-card profile-recent-card">
-                <p>Recently Finished</p>
-
-                {recentFinishedReads.length ? (
-                  <div className="profile-recent-grid">
-                    {recentFinishedReads.map((item) => (
-                      <button
-                        type="button"
-                        key={item.id}
-                        className="profile-recent-book"
-                        onClick={() => openSavedReview(item)}
-                        aria-label={`Open ${item.bookInfo.title || "book"} review`}
-                        title={`${item.bookInfo.title || "Untitled Book"} by ${item.bookInfo.author || "Unknown Author"}`}
-                      >
-                        {item.bookInfo.coverUrl && (
-                          <img src={item.bookInfo.coverUrl} alt={`${item.bookInfo.title} cover`} />
-                        )}
-                        <strong>{item.bookInfo.title || "Untitled Book"}</strong>
-                        <p>{item.bookInfo.author || "Unknown Author"}</p>
-                        <p>⭐ {item.bookScore}/5</p>
-                      </button>
-                    ))}
-                  </div>
-                ) : (
-                  <p>No recent finished books yet.</p>
-                )}
-              </div>
-
-              <div className="score-card">
-                <p>Achievement Showcase</p>
-                <p>Unlocked Achievements: {achievementStats.unlocked} / {achievementStats.total}</p>
-              </div>
-            </>
-          ) : (
-            <div className="score-card">
-              <p>🔒 This profile is private.</p>
-              <p>Turn on public sharing in Edit Profile to preview the public version.</p>
-            </div>
-          )}
-
-          <button type="button" onClick={() => setStep("profile")}>Back to Profile</button>
-        </section>
-      )}
-
+  <PublicProfilePreviewPage
+    cleanProfileUsername={cleanProfileUsername}
+    profile={profile}
+    profileDisplayName={profileDisplayName}
+    profileReadingAesthetic={profileReadingAesthetic}
+    profileReaderType={profileReaderType}
+    profileFavoriteSubgenre={profileFavoriteSubgenre}
+    yearToDateCount={yearToDateCount}
+    followStats={followStats}
+    readingStreakStats={readingStreakStats}
+    averageRating={averageRating}
+    savedReviews={savedReviews}
+    profilePreviewShelf={profilePreviewShelf}
+    setProfilePreviewShelf={setProfilePreviewShelf}
+    openSavedReview={openSavedReview}
+    getReadingHeatMapStats={getReadingHeatMapStats}
+    formatDateKey={formatDateKey}
+    recentFinishedReads={recentFinishedReads}
+    achievementStats={achievementStats}
+    setStep={setStep}
+  />
+)}
 
      {step === "editProfile" && (
   <EditProfilePage
@@ -5552,150 +5350,52 @@ loadFollowStats(currentUser.id, currentUser)
 
 
       {step === "analytics" && (
-        <section>
-          <p>Reading Analytics</p>
-          <h1>Your reading data dashboard.</h1>
-          <p>Built from your reading log entries, finished dates, pages, minutes, and notes.</p>
-
-          {saveMessage && <p>{saveMessage}</p>}
-
-          <div className="analytics-tabs" aria-label="Reading analytics sections">
-            <button type="button" className={analyticsTab === "overview" ? "active" : ""} onClick={() => setAnalyticsTab("overview")}>Overview</button>
-            <button type="button" className={analyticsTab === "goals" ? "active" : ""} onClick={() => setAnalyticsTab("goals")}>Reading Goals</button>
-            <button type="button" className={analyticsTab === "achievements" ? "active" : ""} onClick={() => setAnalyticsTab("achievements")}>Achievements</button>
-            <button type="button" className={analyticsTab === "calendar" ? "active" : ""} onClick={() => setAnalyticsTab("calendar")}>Reading Calendar</button>
-            <button type="button" className={analyticsTab === "wrapUps" ? "active" : ""} onClick={() => setAnalyticsTab("wrapUps")}>Wrap-Ups</button>
-            <button type="button" className={analyticsTab === "yearInBooks" ? "active" : ""} onClick={() => setAnalyticsTab("yearInBooks")}>Year In Books</button>
-          </div>
-
-         <ReadingGoalsPanel
-  analyticsTab={analyticsTab}
-  readingGoals={readingGoals}
-  readingGoalStats={readingGoalStats}
-  updateReadingGoal={updateReadingGoal}
-/>
-          <AchievementsPanel
-  analyticsTab={analyticsTab}
-  achievementStats={achievementStats}
-  downloadAchievementGraphicPng={downloadAchievementGraphicPng}
-/>
-
-         <ReadingCalendarPanel
-  analyticsTab={analyticsTab}
-  readingCalendarStats={readingCalendarStats}
-  selectedCalendarDate={selectedCalendarDate}
-  setSelectedCalendarDate={setSelectedCalendarDate}
-  shiftCalendarMonth={shiftCalendarMonth}
-  formatDateKey={formatDateKey}
-/>
-
-         <MonthlyWrapUpPanel
-  analyticsTab={analyticsTab}
-  monthlyWrapUpStats={monthlyWrapUpStats}
-  wrapUpMonthKey={wrapUpMonthKey}
-  setWrapUpMonthKey={setWrapUpMonthKey}
-  wrapUpMonthOptions={wrapUpMonthOptions}
-  getMonthlyWrapUpGraphicDataUrl={getMonthlyWrapUpGraphicDataUrl}
-  downloadMonthlyWrapUpGraphicPng={downloadMonthlyWrapUpGraphicPng}
-  downloadMonthlyWrapUpGraphicSvg={downloadMonthlyWrapUpGraphicSvg}
-/>
-          <YearInBooksPanel
-  analyticsTab={analyticsTab}
-  yearInBooksStats={yearInBooksStats}
-  yearInBooksKey={yearInBooksKey}
-  setYearInBooksKey={setYearInBooksKey}
-  yearInBooksOptions={yearInBooksOptions}
-  getYearInBooksGraphicDataUrl={getYearInBooksGraphicDataUrl}
-  downloadYearInBooksGraphicPng={downloadYearInBooksGraphicPng}
-  downloadYearInBooksGraphicSvg={downloadYearInBooksGraphicSvg}
-/>
-
-
-         <LibraryOverviewPanel
-  analyticsTab={analyticsTab}
-  savedReviews={savedReviews}
-  totalBooks={totalBooks}
-  finishedReviews={finishedReviews}
-  yearToDateCount={yearToDateCount}
-  currentlyReadingReviews={currentlyReadingReviews}
-  dnfReviews={dnfReviews}
-  brainChemistryCount={brainChemistryCount}
-/>
-
-         <ReviewAveragesPanel
-  analyticsTab={analyticsTab}
-  finishedReviews={finishedReviews}
-  averageRating={averageRating}
-  averageSpice={averageSpice}
-  averageObsession={averageObsession}
-  mostReadTrope={mostReadTrope}
-  mostReadAuthor={mostReadAuthor}
-/>
-
-          <div className={`score-card ${analyticsTab === "overview" ? "" : "analytics-panel-hidden"}`}>
-            <p>🔥 Reading Activity</p>
-            <p>Current Streak: {readingStreakStats.currentStreak} days</p>
-            <p>Longest Streak: {readingStreakStats.longestStreak} days</p>
-            <p>Reading Days This Month: {readingAnalyticsStats.readingDaysThisMonth}</p>
-            <p>Reading Days This Year: {readingAnalyticsStats.readingDaysThisYear}</p>
-            <p>Total Reading Sessions: {readingAnalyticsStats.totalSessions}</p>
-            {readingStreakStats.lastLoggedDate && (
-              <p>Last Reading Day: {formatDateKey(readingStreakStats.lastLoggedDate)}</p>
-            )}
-          </div>
-
-          <div className={`score-card ${analyticsTab === "overview" ? "" : "analytics-panel-hidden"}`}>
-            <p>🌸 Pressed Petals</p>
-            <p>A bloom for every day you spent reading.</p>
-            <ReadingHeatMap
-             heatMapStats={getReadingHeatMapStats(180)}
-             formatDateKey={formatDateKey}
-              />
-          </div>
-
-          <div className={`score-card ${analyticsTab === "overview" ? "" : "analytics-panel-hidden"}`}>
-            <p>📄 Pages</p>
-            <p>Pages Read This Month: {readingAnalyticsStats.pagesThisMonth}</p>
-            <p>Pages Read This Year: {readingAnalyticsStats.pagesThisYear}</p>
-            <p>Total Pages Logged: {readingAnalyticsStats.totalPages}</p>
-            <p>Average Pages Per Reading Day: {readingAnalyticsStats.averagePagesPerReadingDay}</p>
-            {readingAnalyticsStats.biggestReadingDay && (
-              <p>
-                Biggest Reading Day: {readingAnalyticsStats.biggestReadingDay.pages} pages on {formatDateKey(readingAnalyticsStats.biggestReadingDay.date)}
-              </p>
-            )}
-          </div>
-
-          <div className={`score-card ${analyticsTab === "overview" ? "" : "analytics-panel-hidden"}`}>
-            <p>⏱️ Time</p>
-            <p>Minutes Read This Month: {readingAnalyticsStats.minutesThisMonth}</p>
-            <p>Minutes Read This Year: {readingAnalyticsStats.minutesThisYear}</p>
-            <p>Total Hours Read: {readingAnalyticsStats.totalHours}</p>
-            <p>Average Session Length: {readingAnalyticsStats.averageSessionLength} minutes</p>
-            <p>Estimated Pace: {readingAnalyticsStats.pagesPerHour} pages/hour</p>
-          </div>
-
-          <div className={`score-card ${analyticsTab === "overview" ? "" : "analytics-panel-hidden"}`}>
-            <p>✅ Finished Book Stats</p>
-            <p>Books Finished This Month: {readingAnalyticsStats.finishedThisMonth}</p>
-            <p>Books Finished This Year: {readingAnalyticsStats.finishedThisYear}</p>
-            <p>Average Days to Finish: {readingAnalyticsStats.averageDaysToFinish}</p>
-            {readingAnalyticsStats.fastestRead && (
-              <p>
-                Fastest Read: {readingAnalyticsStats.fastestRead.item.bookInfo.title || "Untitled Book"} • {readingAnalyticsStats.fastestRead.days} day{readingAnalyticsStats.fastestRead.days === 1 ? "" : "s"}
-              </p>
-            )}
-            {readingAnalyticsStats.slowestRead && (
-              <p>
-                Slowest Read: {readingAnalyticsStats.slowestRead.item.bookInfo.title || "Untitled Book"} • {readingAnalyticsStats.slowestRead.days} day{readingAnalyticsStats.slowestRead.days === 1 ? "" : "s"}
-              </p>
-            )}
-          </div>
-
-          <button onClick={() => setStep("home")}>Back Home</button>
-          <button onClick={() => setStep("currentlyReading")}>Currently Reading</button>
-        </section>
-      )}
+  <AnalyticsPage
+    saveMessage={saveMessage}
+    analyticsTab={analyticsTab}
+    setAnalyticsTab={setAnalyticsTab}
+    readingGoals={readingGoals}
+    readingGoalStats={readingGoalStats}
+    updateReadingGoal={updateReadingGoal}
+    achievementStats={achievementStats}
+    downloadAchievementGraphicPng={downloadAchievementGraphicPng}
+    readingCalendarStats={readingCalendarStats}
+    selectedCalendarDate={selectedCalendarDate}
+    setSelectedCalendarDate={setSelectedCalendarDate}
+    shiftCalendarMonth={shiftCalendarMonth}
+    formatDateKey={formatDateKey}
+    monthlyWrapUpStats={monthlyWrapUpStats}
+    wrapUpMonthKey={wrapUpMonthKey}
+    setWrapUpMonthKey={setWrapUpMonthKey}
+    wrapUpMonthOptions={wrapUpMonthOptions}
+    getMonthlyWrapUpGraphicDataUrl={getMonthlyWrapUpGraphicDataUrl}
+    downloadMonthlyWrapUpGraphicPng={downloadMonthlyWrapUpGraphicPng}
+    downloadMonthlyWrapUpGraphicSvg={downloadMonthlyWrapUpGraphicSvg}
+    yearInBooksStats={yearInBooksStats}
+    yearInBooksKey={yearInBooksKey}
+    setYearInBooksKey={setYearInBooksKey}
+    yearInBooksOptions={yearInBooksOptions}
+    getYearInBooksGraphicDataUrl={getYearInBooksGraphicDataUrl}
+    downloadYearInBooksGraphicPng={downloadYearInBooksGraphicPng}
+    downloadYearInBooksGraphicSvg={downloadYearInBooksGraphicSvg}
+    savedReviews={savedReviews}
+    totalBooks={totalBooks}
+    finishedReviews={finishedReviews}
+    yearToDateCount={yearToDateCount}
+    currentlyReadingReviews={currentlyReadingReviews}
+    dnfReviews={dnfReviews}
+    brainChemistryCount={brainChemistryCount}
+    averageRating={averageRating}
+    averageSpice={averageSpice}
+    averageObsession={averageObsession}
+    mostReadTrope={mostReadTrope}
+    mostReadAuthor={mostReadAuthor}
+    readingStreakStats={readingStreakStats}
+    readingAnalyticsStats={readingAnalyticsStats}
+    getReadingHeatMapStats={getReadingHeatMapStats}
+    setStep={setStep}
+  />
+)}
 
 
      {step === "currentlyReading" && (

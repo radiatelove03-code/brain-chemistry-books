@@ -20,7 +20,7 @@ function CommunityChallengesPage({
 }) {
   return (
     <section>
-      <p>Phase 12A • Community Challenges</p>
+      <p>Community Challenges</p>
       <h1>Challenge Hub</h1>
       <p>
         Join cozy reading challenges, track your progress automatically from your library,
