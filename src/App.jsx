@@ -7,6 +7,16 @@ import ReaderCard from "./components/ReaderCard"
 import ReadingHeatMap from "./components/ReadingHeatMap"
 import CommunityChallengeCard from "./components/CommunityChallengeCard"
 import YearInBooksPanel from "./components/YearInBooksPanel"
+import LibraryOverviewPanel from "./components/LibraryOverviewPanel"
+import ReviewAveragesPanel from "./components/ReviewAveragesPanel"
+import ReadingGoalsPanel from "./components/ReadingGoalsPanel"
+import AchievementsPanel from "./components/AchievementsPanel"
+import MonthlyWrapUpPanel from "./components/MonthlyWrapUpPanel"
+import ReadingCalendarPanel from "./components/ReadingCalendarPanel"
+import CommunityChallengesPage from "./components/CommunityChallengesPage"
+import ActivityFeedPage from "./components/ActivityFeedPage"
+import ProfilePage from "./components/ProfilePage"
+import EditProfilePage from "./components/EditProfilePage"
 
 const tropeOptions = [
   "Small Town",
@@ -5378,441 +5388,88 @@ loadFollowStats(currentUser.id, currentUser)
 
 
 
-      {step === "communityChallenges" && (
-        <section>
-          <p>Phase 12A • Community Challenges</p>
-          <h1>Challenge Hub</h1>
-          <p>Join cozy reading challenges, track your progress automatically from your library, and see which readers are participating with you.</p>
-
-          <div className="community-challenge-summary">
-            <div className="score-card">
-              <p>Joined</p>
-              <h2>{joinedCommunityChallengeIds.length}</h2>
-              <p>challenge{joinedCommunityChallengeIds.length === 1 ? "" : "s"}</p>
-            </div>
-            <div className="score-card">
-              <p>Completed</p>
-              <h2>{completedCommunityChallengeCount}</h2>
-              <p>finished challenge{completedCommunityChallengeCount === 1 ? "" : "s"}</p>
-            </div>
-            <div className="score-card">
-              <p>Community</p>
-              <h2>{totalCommunityReaderCount}</h2>
-              <p>reader{totalCommunityReaderCount === 1 ? "" : "s"} participating</p>
-            </div>
-          </div>
-
-          <div className="community-challenge-filter-tabs" aria-label="Challenge filters">
-            {[
-              ["all", "All"],
-              ["joined", "Joined"],
-              ["completed", "Completed"],
-              ["open", "Still Open"],
-            ].map(([filterId, label]) => (
-              <button
-                type="button"
-                key={filterId}
-                className={communityChallengeView === filterId ? "active" : ""}
-                onClick={() => setCommunityChallengeView(filterId)}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-
-          <div className="community-challenge-grid">
-            {visibleCommunityChallenges.map((challenge) => {
-              const challengeProgress = getCommunityChallengeProgress(challenge)
-              const isJoined = joinedCommunityChallengeSet.has(challenge.id)
-              const participantCount = getCommunityChallengeParticipantCount(challenge.id)
-              const participantProfiles = getCommunityChallengeParticipants(challenge.id)
-              const visibleParticipantProfiles = participantProfiles.slice(0, 4)
-              const hiddenParticipantCount = Math.max(0, participantCount - visibleParticipantProfiles.length)
-              const leaderboard = getCommunityChallengeLeaderboard(challenge.id)
-              const topLeaderboardReaders = leaderboard.topReaders || []
-              const ownLeaderboardEntry = leaderboard.ownEntry || null
-              const isPrivateLeaderboardReader = isJoined && Boolean(user) && !profile.isPublicProfile
-
-              return (
-                <CommunityChallengeCard
-  key={challenge.id}
-  challenge={challenge}
-  challengeProgress={challengeProgress}
-  isJoined={isJoined}
-  participantCount={participantCount}
-  visibleParticipantProfiles={visibleParticipantProfiles}
-  hiddenParticipantCount={hiddenParticipantCount}
-  leaderboard={leaderboard}
-  topLeaderboardReaders={topLeaderboardReaders}
-  ownLeaderboardEntry={ownLeaderboardEntry}
-  isPrivateLeaderboardReader={isPrivateLeaderboardReader}
-  toggleCommunityChallenge={toggleCommunityChallenge}
-  openSavedReview={openSavedReview}
-/>
-              )
-            })}
-          </div>
-
-          {visibleCommunityChallenges.length === 0 && (
-            <div className="score-card">
-              <p>No challenges match that filter yet.</p>
-              <p>Join a challenge or finish a matching book to fill this shelf.</p>
-            </div>
-          )}
-
-          <button type="button" onClick={() => setStep("home")}>Back Home</button>
-        </section>
-      )}
-
+     {step === "communityChallenges" && (
+  <CommunityChallengesPage
+    joinedCommunityChallengeIds={joinedCommunityChallengeIds}
+    completedCommunityChallengeCount={completedCommunityChallengeCount}
+    totalCommunityReaderCount={totalCommunityReaderCount}
+    communityChallengeView={communityChallengeView}
+    setCommunityChallengeView={setCommunityChallengeView}
+    visibleCommunityChallenges={visibleCommunityChallenges}
+    getCommunityChallengeProgress={getCommunityChallengeProgress}
+    joinedCommunityChallengeSet={joinedCommunityChallengeSet}
+    getCommunityChallengeParticipantCount={getCommunityChallengeParticipantCount}
+    getCommunityChallengeParticipants={getCommunityChallengeParticipants}
+    getCommunityChallengeLeaderboard={getCommunityChallengeLeaderboard}
+    user={user}
+    profile={profile}
+    toggleCommunityChallenge={toggleCommunityChallenge}
+    openSavedReview={openSavedReview}
+    setStep={setStep}
+  />
+)}
 
       {step === "activityFeed" && (
-        <section>
-          <p>Friends & Following</p>
-          <h1>Activity Feed</h1>
-          <p>See recent reading updates from you and the readers you follow.</p>
+  <ActivityFeedPage
+    user={user}
+    activityFeedMessage={activityFeedMessage}
+    activityFeedLoading={activityFeedLoading}
+    activityFeed={activityFeed}
+    loadActivityFeed={loadActivityFeed}
+    setStep={setStep}
+    formatDate={formatDate}
+    getActivityIcon={getActivityIcon}
+    getActivityLabel={getActivityLabel}
+    toggleActivityLike={toggleActivityLike}
+  />
+)}
 
-          {activityFeedMessage && <p>{activityFeedMessage}</p>}
-
-          <div className="activity-feed-actions">
-            <button type="button" onClick={() => loadActivityFeed(user)}>Refresh Feed</button>
-            <button type="button" onClick={() => setStep("profile")}>My Profile</button>
-          </div>
-
-          {!user && (
-            <div className="score-card">
-              <p>Log in to see your personalized reading feed.</p>
-            </div>
-          )}
-
-          {user && activityFeedLoading && <p>Loading activity...</p>}
-
-          {user && !activityFeedLoading && activityFeed.length === 0 && (
-            <div className="score-card">
-              <p>🌸 Your feed is quiet for now.</p>
-              <p>Follow a public reader profile or save a book update to start filling this page.</p>
-            </div>
-          )}
-
-          {user && !activityFeedLoading && activityFeed.length > 0 && (
-            <div className="activity-feed-list">
-              {activityFeed.map((event) => {
-                const eventData = event.event_data || {}
-                const reader = event.readerProfile || {}
-                const profileData = reader.profile_data || {}
-                const readerName = profileData.displayName || reader.display_name || reader.username || (event.isOwnActivity ? "You" : "Pressed Pages Reader")
-                const readerUsername = reader.username || "reader"
-                const avatarUrl = profileData.avatarUrl || reader.avatar_url || ""
-
-                return (
-                  <article key={event.id} className="activity-feed-card">
-                    <ReaderCard
-                      reader={{
-                        ...reader,
-                        displayName: event.isOwnActivity ? "You" : readerName,
-                        username: readerUsername,
-                        avatarUrl,
-                        profileData,
-                      }}
-                      stats={reader?.stats_data || reader?.statsData || {}}
-                      isOwnReader={event.isOwnActivity}
-                      compact
-                      meta={formatDate(event.created_at)}
-                    />
-
-                    <div className="activity-feed-body">
-                      <p className="activity-feed-type">{getActivityIcon(event.event_type)} {getActivityLabel(event.event_type)}</p>
-                      <div className="activity-feed-book">
-                        {eventData.coverUrl && <img src={eventData.coverUrl} alt={`${eventData.title} cover`} />}
-                        <div>
-                          <h3>{eventData.title || "Untitled Book"}</h3>
-                          <p>{eventData.author || "Unknown Author"}</p>
-                          <p>
-                            {eventData.rating ? `⭐ ${eventData.rating}/5` : ""}
-                            {eventData.spice ? ` • 🌶️ ${eventData.spice}/5` : ""}
-                            {eventData.obsession ? ` • ❤️ ${eventData.obsession}/5` : ""}
-                            {eventData.isFavorite ? " • 🧠 Brain chemistry" : ""}
-                          </p>
-                          {eventData.oneSentenceReview && <p>“{eventData.oneSentenceReview}”</p>}
-                        </div>
-                      </div>
-
-                      <div className="activity-reaction-row">
-                        <button
-                          type="button"
-                          className={event.hasLiked ? "activity-like-button liked" : "activity-like-button"}
-                          onClick={() => toggleActivityLike(event)}
-                        >
-                          {event.hasLiked ? "💗 Liked" : "🤍 Like"}
-                        </button>
-                        <span>{Number(event.likeCount || 0)} {Number(event.likeCount || 0) === 1 ? "like" : "likes"}</span>
-                      </div>
-                    </div>
-                  </article>
-                )
-              })}
-            </div>
-          )}
-
-          <button type="button" onClick={() => setStep("home")}>Back Home</button>
-        </section>
-      )}
-
-
-      {step === "profile" && (
-        <section>
-          <p>Pressed Pages Profile</p>
-          <h1>Your reader scrapbook.</h1>
-          <p>{profile.isPublicProfile ? "Public profile is enabled — your reader scrapbook is ready to share." : "Private by default — turn on public sharing when you want a profile link."}</p>
-
-          {profileSavedMessage && <p>{profileSavedMessage}</p>}
-
-          <ReaderCard
-            reader={{
-              username: cleanProfileUsername,
-              displayName: profileDisplayName,
-              avatarUrl: profile.avatarUrl,
-              profileData: {
-                ...profile,
-                readingAesthetic: profileReadingAesthetic,
-                readerType: profileReaderType,
-                favoriteSubgenre: profileFavoriteSubgenre,
-              },
-            }}
-            stats={{ booksThisYear: yearToDateCount }}
-            followStats={followStats}
-            isOwnReader
-            actionLabel="Edit Profile"
-            onAction={() => setStep("editProfile")}
-          />
-
-          <div className="profile-card">
-            <div className="profile-header">
-              <div className="profile-avatar">
-                {profile.avatarUrl ? (
-                  <img src={profile.avatarUrl} alt={`${profileDisplayName} avatar`} />
-                ) : (
-                  <span>📚</span>
-                )}
-              </div>
-
-              <div>
-                <p>Read • Rate • Romanticize</p>
-                <h2>{profileDisplayName}</h2>
-                <p>@{cleanProfileUsername}</p>
-                <div className="follow-count-row">
-                  <span><strong>{followStats.followers}</strong> follower{followStats.followers === 1 ? "" : "s"}</span>
-                  <span><strong>{followStats.following}</strong> following</span>
-                </div>
-                <p>{profile.bio || "Add a little reader bio to make this page feel like yours."}</p>
-              </div>
-            </div>
-
-            <div className="profile-banner">
-              <p>Reader Flair</p>
-              <div className="profile-flair-row">
-                <span>{profileReadingAesthetic}</span>
-                <span>{profileReaderType}</span>
-                <span>{profileFavoriteSubgenre}</span>
-              </div>
-            </div>
-
-            <div className="profile-favorites-grid">
-              <div>
-                <strong>Favorite Genre</strong>
-                <p>{profileFavoriteGenre}</p>
-              </div>
-              <div>
-                <strong>Favorite Trope</strong>
-                <p>{profileFavoriteTrope}</p>
-              </div>
-              <div>
-                <strong>Favorite Reading Vibe</strong>
-                <p>{profileFavoriteVibe}</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="profile-public-card">
-            <p>Public Profile</p>
-            <h3>{profile.isPublicProfile ? "🌎 Public profile enabled" : "🔒 Profile is private"}</h3>
-            <p>
-              {profile.isPublicProfile
-                ? "Share a reader-safe version of this page with your profile link."
-                : "Your profile stays private until you turn public sharing on in Edit Profile."}
-            </p>
-
-            {profile.isPublicProfile && (
-              <>
-                <input readOnly value={publicProfileUrl} aria-label="Public profile link" />
-                <button type="button" onClick={copyPublicProfileLink}>Copy Profile Link</button>
-                <button type="button" onClick={() => setStep("publicProfilePreview")}>Preview Public Profile</button>
-              </>
-            )}
-          </div>
-
-          <button onClick={() => setStep("editProfile")}>Edit Profile</button>
-
-          <div className="profile-stats-grid">
-            <div className="score-card">
-              <p>📚 Books This Year</p>
-              <h2>{yearToDateCount}</h2>
-            </div>
-            <div className="score-card">
-              <p>🔥 Current Streak</p>
-              <h2>{readingStreakStats.currentStreak}</h2>
-              <p>day{readingStreakStats.currentStreak === 1 ? "" : "s"}</p>
-            </div>
-            <div className="score-card">
-              <p>🏆 Longest Streak</p>
-              <h2>{readingStreakStats.longestStreak}</h2>
-              <p>day{readingStreakStats.longestStreak === 1 ? "" : "s"}</p>
-            </div>
-            <div className="score-card">
-              <p>⭐ Average Rating</p>
-              <h2>{averageRating}</h2>
-              <p>out of 5</p>
-            </div>
-            <div className="score-card">
-              <p>🌶️ Average Spice</p>
-              <h2>{averageSpice}</h2>
-              <p>out of 5</p>
-            </div>
-            <div className="score-card">
-              <p>📖 Reading Days</p>
-              <h2>{readingAnalyticsStats.readingDaysThisYear}</h2>
-              <p>this year</p>
-            </div>
-          </div>
-
-          <div className="score-card">
-            <p>🌸 Pressed Petals</p>
-            <p>A bloom for every day you spent reading.</p>
-            <ReadingHeatMap
-              heatMapStats={getReadingHeatMapStats(90)}
-             compact
-             formatDateKey={formatDateKey}
-              />
-          </div>
-
-          <div className="score-card profile-recent-card">
-            <p>Recently Finished Shelf</p>
-
-            {recentFinishedReads.length ? (
-              <div className="profile-recent-grid">
-                {recentFinishedReads.map((item) => (
-                  <button
-                    type="button"
-                    key={item.id}
-                    className="profile-recent-book"
-                    onClick={() => openSavedReview(item)}
-                    aria-label={`Open ${item.bookInfo.title || "book"} review`}
-                    title={`${item.bookInfo.title || "Untitled Book"} by ${item.bookInfo.author || "Unknown Author"}`}
-                  >
-                    {item.bookInfo.coverUrl && (
-                      <img src={item.bookInfo.coverUrl} alt={`${item.bookInfo.title} cover`} />
-                    )}
-                    <strong>{item.bookInfo.title || "Untitled Book"}</strong>
-                    <p>{item.bookInfo.author || "Unknown Author"}</p>
-                    <p>⭐ {item.bookScore}/5 • 🌶️ {item.metrics?.spice || 0}/5</p>
-                    {item.bookInfo.dateFinished && (
-                      <p>Finished {formatDate(item.bookInfo.dateFinished)}</p>
-                    )}
-                  </button>
-                ))}
-              </div>
-            ) : (
-              <p>No finished books yet. Finish a book to start building your shelf.</p>
-            )}
-          </div>
-
-          <div className="score-card">
-            <p>Achievement Showcase</p>
-            <p>Unlocked Achievements: {achievementStats.unlocked} / {achievementStats.total}</p>
-            {achievementStats.nextAchievement ? (
-              <p>Next Up: {achievementStats.nextAchievement.icon} {achievementStats.nextAchievement.name}</p>
-            ) : (
-              <p>Every achievement is unlocked. Icon behavior.</p>
-            )}
-          </div>
-
-          <button onClick={() => setStep("home")}>Back Home</button>
-        </section>
-      )}
+     {step === "profile" && (
+  <ProfilePage
+    profile={profile}
+    profileSavedMessage={profileSavedMessage}
+    cleanProfileUsername={cleanProfileUsername}
+    profileDisplayName={profileDisplayName}
+    profileReadingAesthetic={profileReadingAesthetic}
+    profileReaderType={profileReaderType}
+    profileFavoriteSubgenre={profileFavoriteSubgenre}
+    profileFavoriteGenre={profileFavoriteGenre}
+    profileFavoriteTrope={profileFavoriteTrope}
+    profileFavoriteVibe={profileFavoriteVibe}
+    followStats={followStats}
+    yearToDateCount={yearToDateCount}
+    publicProfileUrl={publicProfileUrl}
+    copyPublicProfileLink={copyPublicProfileLink}
+    readingStreakStats={readingStreakStats}
+    averageRating={averageRating}
+    averageSpice={averageSpice}
+    readingAnalyticsStats={readingAnalyticsStats}
+    getReadingHeatMapStats={getReadingHeatMapStats}
+    formatDateKey={formatDateKey}
+    recentFinishedReads={recentFinishedReads}
+    openSavedReview={openSavedReview}
+    formatDate={formatDate}
+    achievementStats={achievementStats}
+    setStep={setStep}
+  />
+)}
 
 
       {step === "publicProfileView" && (
-        <section>
-          <p>Public Reader Profile</p>
-          <h1>{publicProfileView ? `@${publicProfileView.username}` : "Reader profile"}</h1>
-
-          {publicProfileLoading && <p>Loading public profile...</p>}
-          {publicProfileMessage && <p>{publicProfileMessage}</p>}
-
-          {publicProfileView ? (
-            <>
-              <ReaderCard
-                reader={publicProfileView}
-                stats={publicProfileView.statsData || {}}
-                followStats={followStats}
-                actionLabel={
-                  user && publicProfileView.userId !== user.id
-                    ? followStats.isFollowing
-                      ? "Following ✓"
-                      : "Follow Reader"
-                    : ""
-                }
-                onAction={
-                  user && publicProfileView.userId !== user.id
-                    ? toggleFollowPublicProfile
-                    : null
-                }
-              />
-
-              {!user && <p>Log in to follow @{publicProfileView.username}.</p>}
-
-              <div className="profile-stats-grid">
-                <div className="score-card">
-                  <p>📚 Books This Year</p>
-                  <h2>{publicProfileView.statsData?.booksThisYear || 0}</h2>
-                </div>
-                <div className="score-card">
-                  <p>🔥 Current Streak</p>
-                  <h2>{publicProfileView.statsData?.currentStreak || 0}</h2>
-                  <p>day{publicProfileView.statsData?.currentStreak === 1 ? "" : "s"}</p>
-                </div>
-                <div className="score-card">
-                  <p>🏆 Longest Streak</p>
-                  <h2>{publicProfileView.statsData?.longestStreak || 0}</h2>
-                  <p>day{publicProfileView.statsData?.longestStreak === 1 ? "" : "s"}</p>
-                </div>
-                <div className="score-card">
-                  <p>⭐ Average Rating</p>
-                  <h2>{publicProfileView.statsData?.averageRating || "0.0"}</h2>
-                  <p>out of 5</p>
-                </div>
-              </div>
-
-              <ReaderShelves
-                books={publicProfileBooks}
-                activeShelf={publicProfileShelf}
-                onShelfChange={setPublicProfileShelf}
-                emptyName={`@${publicProfileView.username}`}
-                onOpenBook={openSavedReview}
-              />
-
-              <button type="button" onClick={() => setStep("home")}>Back Home</button>
-            </>
-          ) : (
-            !publicProfileLoading && (
-              <div className="score-card">
-                <p>🔒 No public profile loaded.</p>
-                <p>This reader may have turned their profile private.</p>
-                <button type="button" onClick={() => setStep("home")}>Back Home</button>
-              </div>
-            )
-          )}
-        </section>
-      )}
+  <PublicProfileViewPage
+    publicProfileView={publicProfileView}
+    publicProfileLoading={publicProfileLoading}
+    publicProfileMessage={publicProfileMessage}
+    user={user}
+    followStats={followStats}
+    toggleFollowPublicProfile={toggleFollowPublicProfile}
+    publicProfileBooks={publicProfileBooks}
+    publicProfileShelf={publicProfileShelf}
+    setPublicProfileShelf={setPublicProfileShelf}
+    openSavedReview={openSavedReview}
+    setStep={setStep}
+  />
+)}
 
 
       {step === "publicProfilePreview" && (
@@ -5924,178 +5581,22 @@ loadFollowStats(currentUser.id, currentUser)
       )}
 
 
-      {step === "editProfile" && (
-        <section>
-          <p>Pressed Pages Profile</p>
-          <h1>Edit your reader scrapbook.</h1>
-          <p>Update your profile details, reader flair, and square avatar image.</p>
-
-          {profileSavedMessage && <p>{profileSavedMessage}</p>}
-
-          <div className="profile-card profile-edit-preview">
-            <div className="profile-header">
-              <div className="profile-avatar">
-                {profile.avatarUrl ? (
-                  <img src={profile.avatarUrl} alt={`${profileDisplayName} avatar preview`} />
-                ) : (
-                  <span>📚</span>
-                )}
-              </div>
-
-              <div>
-                <p>Preview</p>
-                <h2>{profileDisplayName}</h2>
-                <p>@{cleanProfileUsername}</p>
-                <div className="follow-count-row">
-                  <span><strong>{followStats.followers}</strong> follower{followStats.followers === 1 ? "" : "s"}</span>
-                  <span><strong>{followStats.following}</strong> following</span>
-                </div>
-                <p>{profile.bio || "Add a little reader bio to make this page feel like yours."}</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="score-card profile-edit-card">
-            <p>Edit Profile</p>
-
-            <label>
-              Display Name
-              <input
-                type="text"
-                value={profile.displayName}
-                onChange={(event) => updateProfile("displayName", event.target.value)}
-                placeholder="Example: Kenna Jean"
-              />
-            </label>
-
-            <label>
-              Username
-              <input
-                type="text"
-                value={profile.username}
-                onChange={(event) => updateProfile("username", event.target.value)}
-                placeholder="Example: kenna_reads"
-              />
-            </label>
-
-            <label>
-              Bio
-              <textarea
-                value={profile.bio}
-                onChange={(event) => updateProfile("bio", event.target.value)}
-                placeholder="Romance reader. Small-town addict. Professional TBR collector."
-              />
-            </label>
-
-            <label>
-              Reading Aesthetic
-              <select
-                value={profile.readingAesthetic || ""}
-                onChange={(event) => updateProfile("readingAesthetic", event.target.value)}
-              >
-                <option value="">Choose a reading aesthetic</option>
-                {readingAestheticOptions.map((option) => (
-                  <option key={option} value={option}>{option}</option>
-                ))}
-              </select>
-            </label>
-
-            <label>
-              Reader Type
-              <select
-                value={profile.readerType || ""}
-                onChange={(event) => updateProfile("readerType", event.target.value)}
-              >
-                <option value="">Choose a reader type</option>
-                {readerTypeOptions.map((option) => (
-                  <option key={option} value={option}>{option}</option>
-                ))}
-              </select>
-            </label>
-
-            <label>
-              Favorite Subgenre
-              <select
-                value={profile.favoriteSubgenre || ""}
-                onChange={(event) => updateProfile("favoriteSubgenre", event.target.value)}
-              >
-                <option value="">Choose a favorite subgenre</option>
-                {favoriteSubgenreOptions.map((option) => (
-                  <option key={option} value={option}>{option}</option>
-                ))}
-              </select>
-            </label>
-
-            <label>
-              Favorite Genre
-              <input
-                type="text"
-                value={profile.favoriteGenre}
-                onChange={(event) => updateProfile("favoriteGenre", event.target.value)}
-                placeholder="Example: Romance"
-              />
-            </label>
-
-            <label>
-              Favorite Trope
-              <input
-                type="text"
-                value={profile.favoriteTrope}
-                onChange={(event) => updateProfile("favoriteTrope", event.target.value)}
-                placeholder="Example: Small Town"
-              />
-            </label>
-
-            <label>
-              Favorite Reading Vibe
-              <input
-                type="text"
-                value={profile.favoriteVibe}
-                onChange={(event) => updateProfile("favoriteVibe", event.target.value)}
-                placeholder="Example: Cozy rural romance"
-              />
-            </label>
-
-            <label>
-              Avatar Image URL
-              <input
-                type="url"
-                value={profile.avatarUrl}
-                onChange={(event) => updateProfile("avatarUrl", event.target.value)}
-                placeholder="Paste an image link for now"
-              />
-            </label>
-
-            <p className="profile-helper-text">Avatar images are automatically cropped to a 200px by 200px square.</p>
-
-            <label className="profile-public-toggle">
-              <input
-                type="checkbox"
-                checked={Boolean(profile.isPublicProfile)}
-                onChange={(event) => updateProfile("isPublicProfile", event.target.checked)}
-              />
-              <span>Make my profile public and shareable</span>
-            </label>
-
-            {profile.isPublicProfile && (
-              <div className="profile-public-card">
-                <p>Your public profile link</p>
-                <input readOnly value={publicProfileUrl} aria-label="Public profile link preview" />
-              </div>
-            )}
-
-            <button
-              onClick={() => {
-                saveProfile()
-                setStep("profile")
-              }}
-            >
-              Save Profile
-            </button>
-            <button onClick={() => setStep("profile")}>Cancel</button>
-          </div>
-        </section>
-      )}
+     {step === "editProfile" && (
+  <EditProfilePage
+    profile={profile}
+    profileSavedMessage={profileSavedMessage}
+    profileDisplayName={profileDisplayName}
+    cleanProfileUsername={cleanProfileUsername}
+    followStats={followStats}
+    updateProfile={updateProfile}
+    readingAestheticOptions={readingAestheticOptions}
+    readerTypeOptions={readerTypeOptions}
+    favoriteSubgenreOptions={favoriteSubgenreOptions}
+    publicProfileUrl={publicProfileUrl}
+    saveProfile={saveProfile}
+    setStep={setStep}
+  />
+)}
 
 
       {step === "analytics" && (
@@ -6115,352 +5616,37 @@ loadFollowStats(currentUser.id, currentUser)
             <button type="button" className={analyticsTab === "yearInBooks" ? "active" : ""} onClick={() => setAnalyticsTab("yearInBooks")}>Year In Books</button>
           </div>
 
-          <div className={`score-card ${analyticsTab === "goals" ? "" : "analytics-panel-hidden"}`}>
-            <p>🎯 Reading Goals for {readingGoalStats.currentYearKey}</p>
+         <ReadingGoalsPanel
+  analyticsTab={analyticsTab}
+  readingGoals={readingGoals}
+  readingGoalStats={readingGoalStats}
+  updateReadingGoal={updateReadingGoal}
+/>
+          <AchievementsPanel
+  analyticsTab={analyticsTab}
+  achievementStats={achievementStats}
+  downloadAchievementGraphicPng={downloadAchievementGraphicPng}
+/>
 
-            <div className="review-field">
-              <label>Books Goal</label>
-              <input
-                type="number"
-                min="0"
-                value={readingGoals.books}
-                onChange={(e) => updateReadingGoal("books", e.target.value)}
-                placeholder="Example: 75"
-              />
-            </div>
+         <ReadingCalendarPanel
+  analyticsTab={analyticsTab}
+  readingCalendarStats={readingCalendarStats}
+  selectedCalendarDate={selectedCalendarDate}
+  setSelectedCalendarDate={setSelectedCalendarDate}
+  shiftCalendarMonth={shiftCalendarMonth}
+  formatDateKey={formatDateKey}
+/>
 
-            <p>{readingGoalStats.booksFinishedThisYear} / {readingGoals.books || 0} books finished</p>
-            <ProgressBar percent={readingGoalStats.booksPercent} />
-
-            <div className="review-field">
-              <label>Pages Goal</label>
-              <input
-                type="number"
-                min="0"
-                value={readingGoals.pages}
-                onChange={(e) => updateReadingGoal("pages", e.target.value)}
-                placeholder="Example: 20000"
-              />
-            </div>
-
-            <p>{readingGoalStats.pagesThisYear} / {readingGoals.pages || 0} pages read</p>
-            <ProgressBar percent={readingGoalStats.pagesPercent} />
-
-            <div className="review-field">
-              <label>Reading Days Goal</label>
-              <input
-                type="number"
-                min="0"
-                value={readingGoals.readingDays}
-                onChange={(e) => updateReadingGoal("readingDays", e.target.value)}
-                placeholder="Example: 200"
-              />
-            </div>
-
-            <p>{readingGoalStats.readingDaysThisYear} / {readingGoals.readingDays || 0} reading days</p>
-            <ProgressBar percent={readingGoalStats.readingDaysPercent} />
-
-            <div className="review-field">
-              <label>Minutes Goal</label>
-              <input
-                type="number"
-                min="0"
-                value={readingGoals.minutes}
-                onChange={(e) => updateReadingGoal("minutes", e.target.value)}
-                placeholder="Example: 6000"
-              />
-            </div>
-
-            <p>{readingGoalStats.minutesThisYear} / {readingGoals.minutes || 0} minutes read ({readingGoalStats.hoursThisYear} hours)</p>
-            <ProgressBar percent={readingGoalStats.minutesPercent} />
-          </div>
-
-          <div className={`score-card ${analyticsTab === "achievements" ? "" : "analytics-panel-hidden"}`}>
-            <p>🏆 Achievements</p>
-            <h2>{achievementStats.unlocked} / {achievementStats.total} unlocked</h2>
-            <ProgressBar percent={achievementStats.total ? Math.round((achievementStats.unlocked / achievementStats.total) * 100) : 0} />
-
-            {achievementStats.nextAchievement && (
-              <p>
-                Next up: {achievementStats.nextAchievement.icon} {achievementStats.nextAchievement.name} ({Math.min(Number(achievementStats.nextAchievement.current || 0), achievementStats.nextAchievement.target)} / {achievementStats.nextAchievement.target})
-              </p>
-            )}
-
-            {achievementStats.groups.map((group) => (
-              <div key={group.title} style={{ marginTop: "1.5rem" }}>
-                <h3>{group.title}</h3>
-
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-                    gap: "1rem",
-                  }}
-                >
-                  {group.achievements.map((achievement) => {
-                    const current = Number(achievement.current || 0)
-                    const unlocked = current >= achievement.target
-                    const progressPercent = achievement.target
-                      ? Math.min(100, Math.round((current / achievement.target) * 100))
-                      : 0
-
-                    return (
-                      <div
-                        key={achievement.id}
-                        style={{
-                          border: unlocked
-                            ? "2px solid rgba(166, 84, 52, 0.75)"
-                            : "1px solid rgba(47, 36, 32, 0.18)",
-                          borderRadius: "1rem",
-                          padding: "1rem",
-                          background: unlocked
-                            ? "rgba(166, 84, 52, 0.14)"
-                            : "rgba(255, 255, 255, 0.45)",
-                        }}
-                      >
-                        <p style={{ fontSize: "2rem", margin: 0 }}>
-                          {unlocked ? achievement.icon : "🔒"}
-                        </p>
-                        <h4 style={{ marginBottom: "0.25rem" }}>{achievement.name}</h4>
-                        <p>{achievement.description}</p>
-                        <p>
-                          {unlocked ? "Unlocked ✅" : `${Math.min(current, achievement.target)} / ${achievement.target}`}
-                        </p>
-                        <ProgressBar percent={progressPercent} />
-                        {unlocked && achievement.id !== "author-era-placeholder" && (
-                          <button
-                            type="button"
-                            className="secondary-button"
-                            style={{ marginTop: "0.75rem", width: "100%" }}
-                            onClick={() => downloadAchievementGraphicPng(achievement, group.title)}
-                          >
-                            🎨 Download Badge Graphic
-                          </button>
-                        )}
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <div className={`score-card ${analyticsTab === "calendar" ? "" : "analytics-panel-hidden"}`}>
-            <p>📅 Reading Calendar</p>
-
-            <div
-              style={{
-                display: "flex",
-                gap: "0.75rem",
-                alignItems: "center",
-                justifyContent: "space-between",
-                flexWrap: "wrap",
-              }}
-            >
-              <button onClick={() => shiftCalendarMonth(-1)}>← Previous Month</button>
-              <h2 style={{ margin: 0 }}>{readingCalendarStats.monthLabel}</h2>
-              <button onClick={() => shiftCalendarMonth(1)}>Next Month →</button>
-            </div>
-
-            <p>
-              {readingCalendarStats.totalDaysRead} reading day{readingCalendarStats.totalDaysRead === 1 ? "" : "s"} •{" "}
-              {readingCalendarStats.totalPages} pages
-              {readingCalendarStats.totalMinutes
-                ? ` • ${readingCalendarStats.totalHours} hours`
-                : ""}
-            </p>
-
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(7, minmax(0, 1fr))",
-                gap: "0.35rem",
-                marginTop: "1rem",
-              }}
-            >
-              {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((dayName) => (
-                <strong key={dayName} style={{ textAlign: "center", fontSize: "0.8rem" }}>
-                  {dayName}
-                </strong>
-              ))}
-
-              {readingCalendarStats.calendarDays.map((day, index) =>
-                day ? (
-                  <button
-                    key={day.date}
-                    onClick={() => setSelectedCalendarDate(day.date)}
-                    style={{
-                      minHeight: "4.5rem",
-                      padding: "0.4rem",
-                      border:
-                        selectedCalendarDate === day.date
-                          ? "2px solid #2f2420"
-                          : "1px solid rgba(47, 36, 32, 0.2)",
-                      borderRadius: "0.75rem",
-                      background: day.sessions
-                        ? "rgba(166, 84, 52, 0.16)"
-                        : "rgba(255, 255, 255, 0.45)",
-                      color: "#2f2420",
-                      textAlign: "left",
-                    }}
-                  >
-                    <strong>{day.day}</strong>
-                    {day.sessions > 0 && (
-                      <>
-                        <br />
-                        <span>{day.pages} pg</span>
-                        <br />
-                        <span>
-                          {day.sessions} log{day.sessions === 1 ? "" : "s"}
-                        </span>
-                      </>
-                    )}
-                  </button>
-                ) : (
-                  <div key={`blank-${index}`} />
-                )
-              )}
-            </div>
-
-            <div style={{ marginTop: "1rem" }}>
-              <p>
-                <strong>
-                  {selectedCalendarDate
-                    ? formatDateKey(selectedCalendarDate)
-                    : "Select a day"}
-                </strong>
-              </p>
-
-              {readingCalendarStats.selectedDay?.logs?.length ? (
-                readingCalendarStats.selectedDay.logs.map((log) => (
-                  <div key={log.id} style={{ marginBottom: "0.75rem" }}>
-                    <p>
-                      <strong>{log.title}</strong>
-                      <br />
-                      {log.pagesRead || 0} pages
-                      {log.endPage ? ` • ended on page ${log.endPage}` : ""}
-                      {log.minutesRead ? ` • ${log.minutesRead} minutes` : ""}
-                    </p>
-                    {log.notes && <p>📝 {log.notes}</p>}
-                  </div>
-                ))
-              ) : (
-                <p>No reading logged for this day.</p>
-              )}
-            </div>
-          </div>
-
-          <div className={`score-card ${analyticsTab === "wrapUps" ? "" : "analytics-panel-hidden"}`}>
-            <p>🌙 Monthly Wrap-Up</p>
-            <h2>{monthlyWrapUpStats.monthLabel}</h2>
-
-            <div className="review-field">
-              <label>Choose Month</label>
-              <select
-                value={wrapUpMonthKey}
-                onChange={(e) => setWrapUpMonthKey(e.target.value)}
-              >
-                {wrapUpMonthOptions.map((monthKey) => {
-                  const [yearPart, monthPart] = monthKey.split("-")
-                  const monthDate = new Date(Number(yearPart), Number(monthPart) - 1, 1)
-                  const monthLabel = monthDate.toLocaleDateString("en-US", {
-                    month: "long",
-                    year: "numeric",
-                  })
-
-                  return (
-                    <option key={monthKey} value={monthKey}>
-                      {monthLabel}
-                    </option>
-                  )
-                })}
-              </select>
-            </div>
-
-            {monthlyWrapUpStats.booksFinished > 0 ? (
-              <>
-                <div className="wrapup-graphic-panel">
-                  <img
-                    className="wrapup-graphic-preview"
-                    src={getMonthlyWrapUpGraphicDataUrl(monthlyWrapUpStats)}
-                    alt={`${monthlyWrapUpStats.monthLabel} Pressed Pages wrap-up graphic preview`}
-                  />
-                  <div className="wrapup-graphic-actions">
-                    <button onClick={() => downloadMonthlyWrapUpGraphicPng(monthlyWrapUpStats)}>
-                      🎨 Download Wrap-Up PNG
-                    </button>
-                    <button onClick={() => downloadMonthlyWrapUpGraphicSvg(monthlyWrapUpStats)}>
-                      Save SVG Backup
-                    </button>
-                  </div>
-                </div>
-
-                <p>Books Finished: {monthlyWrapUpStats.booksFinished}</p>
-                <p>Average Rating: {monthlyWrapUpStats.averageRating}/5</p>
-                <p>Average Spice: {monthlyWrapUpStats.averageSpice}/5</p>
-                <p>Average Obsession: {monthlyWrapUpStats.averageObsession}/5</p>
-                <p>Reading Days Logged: {monthlyWrapUpStats.readingDays}</p>
-                <p>Pages Logged: {monthlyWrapUpStats.pagesLogged}</p>
-                {monthlyWrapUpStats.minutesLogged > 0 && (
-                  <p>
-                    Time Logged: {monthlyWrapUpStats.minutesLogged} minutes ({monthlyWrapUpStats.hoursLogged} hours)
-                  </p>
-                )}
-
-                {monthlyWrapUpStats.topTrope && (
-                  <p>
-                    Favorite Trope: {monthlyWrapUpStats.topTrope[0]} ({monthlyWrapUpStats.topTrope[1]})
-                  </p>
-                )}
-
-                {monthlyWrapUpStats.topAuthor && (
-                  <p>
-                    Most Read Author: {monthlyWrapUpStats.topAuthor[0]} ({monthlyWrapUpStats.topAuthor[1]})
-                  </p>
-                )}
-
-                {monthlyWrapUpStats.highestRated && (
-                  <p>
-                    Highest Rated: {monthlyWrapUpStats.highestRated.bookInfo.title || "Untitled Book"} • {monthlyWrapUpStats.highestRated.bookScore}/5
-                  </p>
-                )}
-
-                {monthlyWrapUpStats.fastestRead && (
-                  <p>
-                    Fastest Read: {monthlyWrapUpStats.fastestRead.item.bookInfo.title || "Untitled Book"} • {monthlyWrapUpStats.fastestRead.days} day{monthlyWrapUpStats.fastestRead.days === 1 ? "" : "s"}
-                  </p>
-                )}
-
-                {monthlyWrapUpStats.slowestRead && (
-                  <p>
-                    Slowest Read: {monthlyWrapUpStats.slowestRead.item.bookInfo.title || "Untitled Book"} • {monthlyWrapUpStats.slowestRead.days} day{monthlyWrapUpStats.slowestRead.days === 1 ? "" : "s"}
-                  </p>
-                )}
-
-                {monthlyWrapUpStats.favoriteReads.length > 0 && (
-                  <p>
-                    Brain Chemistry Reads: {monthlyWrapUpStats.favoriteReads
-                      .map((item) => item.bookInfo.title || "Untitled Book")
-                      .join(", ")}
-                  </p>
-                )}
-
-                <div style={{ marginTop: "1rem" }}>
-                  <h3>Finished Shelf</h3>
-                  {monthlyWrapUpStats.books.map((item) => (
-                    <p key={item.id}>
-                      <strong>{item.bookInfo.title || "Untitled Book"}</strong>
-                      {item.bookInfo.author ? ` by ${item.bookInfo.author}` : ""} • {item.bookScore}/5
-                      {item.metrics?.spice ? ` • 🌶️ ${item.metrics.spice}/5` : ""}
-                    </p>
-                  ))}
-                </div>
-              </>
-            ) : (
-              <p>No books finished in this month yet.</p>
-            )}
-          </div>
-
+         <MonthlyWrapUpPanel
+  analyticsTab={analyticsTab}
+  monthlyWrapUpStats={monthlyWrapUpStats}
+  wrapUpMonthKey={wrapUpMonthKey}
+  setWrapUpMonthKey={setWrapUpMonthKey}
+  wrapUpMonthOptions={wrapUpMonthOptions}
+  getMonthlyWrapUpGraphicDataUrl={getMonthlyWrapUpGraphicDataUrl}
+  downloadMonthlyWrapUpGraphicPng={downloadMonthlyWrapUpGraphicPng}
+  downloadMonthlyWrapUpGraphicSvg={downloadMonthlyWrapUpGraphicSvg}
+/>
           <YearInBooksPanel
   analyticsTab={analyticsTab}
   yearInBooksStats={yearInBooksStats}
@@ -6473,32 +5659,26 @@ loadFollowStats(currentUser.id, currentUser)
 />
 
 
-          {savedReviews.length > 0 && (
-            <div className={`score-card ${analyticsTab === "overview" ? "" : "analytics-panel-hidden"}`}>
-              <p>📚 Library Snapshot</p>
-              <p>Books Saved: {totalBooks}</p>
-              <p>Finished Reviews: {finishedReviews.length}</p>
-              <p>Finished This Year: {yearToDateCount}</p>
-              <p>Currently Reading: {currentlyReadingReviews.length}</p>
-              <p>DNFs: {dnfReviews.length}</p>
-              <p>Brain Chemistry Reads: {brainChemistryCount}</p>
-            </div>
-          )}
+         <LibraryOverviewPanel
+  analyticsTab={analyticsTab}
+  savedReviews={savedReviews}
+  totalBooks={totalBooks}
+  finishedReviews={finishedReviews}
+  yearToDateCount={yearToDateCount}
+  currentlyReadingReviews={currentlyReadingReviews}
+  dnfReviews={dnfReviews}
+  brainChemistryCount={brainChemistryCount}
+/>
 
-          {finishedReviews.length > 0 && (
-            <div className={`score-card ${analyticsTab === "overview" ? "" : "analytics-panel-hidden"}`}>
-              <p>⭐ Review Averages</p>
-              <p>Average Rating: {averageRating}/5</p>
-              <p>Average Spice: {averageSpice}/5</p>
-              <p>Average Obsession: {averageObsession}/5</p>
-              {mostReadTrope && (
-                <p>Most Read Trope: {mostReadTrope[0]} ({mostReadTrope[1]})</p>
-              )}
-              {mostReadAuthor && (
-                <p>Most Read Author: {mostReadAuthor[0]} ({mostReadAuthor[1]})</p>
-              )}
-            </div>
-          )}
+         <ReviewAveragesPanel
+  analyticsTab={analyticsTab}
+  finishedReviews={finishedReviews}
+  averageRating={averageRating}
+  averageSpice={averageSpice}
+  averageObsession={averageObsession}
+  mostReadTrope={mostReadTrope}
+  mostReadAuthor={mostReadAuthor}
+/>
 
           <div className={`score-card ${analyticsTab === "overview" ? "" : "analytics-panel-hidden"}`}>
             <p>🔥 Reading Activity</p>
