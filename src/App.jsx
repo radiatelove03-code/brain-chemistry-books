@@ -6215,18 +6215,36 @@ function TextInput({ label, value, onChange }) {
   )
 }
 
-function ImageUpload({ label, value, onChange }) {
-  function handleImageUpload(event) {
+function ImageUpload({ label, value, onChange, user }) {
+  async function handleImageUpload(event) {
     const file = event.target.files[0]
     if (!file) return
 
-    const reader = new FileReader()
-
-    reader.onloadend = () => {
-      onChange(reader.result)
+    if (!user) {
+      console.error("No user found for image upload.")
+      return
     }
 
-    reader.readAsDataURL(file)
+    const fileExt = file.name.split(".").pop()
+    const fileName = `${user.id}/${Date.now()}.${fileExt}`
+
+    const { error } = await supabase.storage
+      .from("book-covers")
+      .upload(fileName, file, {
+        cacheControl: "3600",
+        upsert: true,
+      })
+
+    if (error) {
+      console.error("Book cover upload error:", error.message)
+      return
+    }
+
+    const { data } = supabase.storage
+      .from("book-covers")
+      .getPublicUrl(fileName)
+
+    onChange(data.publicUrl)
   }
 
   return (
