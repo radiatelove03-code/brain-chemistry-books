@@ -5896,15 +5896,17 @@ async function toggleFollowPublicProfile() {
           <TextInput label="Genre" value={bookInfo.genre} onChange={(value) => updateBookInfo("genre", value)} />
           <TextInput label="Total Pages" value={bookInfo.totalPages} onChange={(value) => updateBookInfo("totalPages", value)} />
 
-          <div className="score-card">
-            <p>Spice Rating</p>
-            <ScoreSlider
-              label="Spice"
-              question="How spicy was the book?"
-              value={metrics.spice}
-              onChange={(value) => updateMetric("spice", value)}
-            />
-          </div>
+{editingReviewId && bookInfo.status === "Finished" && (
+  <div className="score-card">
+    <p>Spice Rating</p>
+    <ScoreSlider
+      label="Spice"
+      question="How spicy was the book?"
+      value={metrics.spice}
+      onChange={(value) => updateMetric("spice", value)}
+    />
+  </div>
+)}
 
           <div className="score-card">
             <p>Reading Dates</p>
@@ -6127,6 +6129,12 @@ async function toggleFollowPublicProfile() {
         <section>
           <p>{editingReviewId ? "Edit Review" : "Step 2 of 5"}</p>
           <h1>Romance Reader Metrics</h1>
+          <ScoreSlider
+  label="Spice"
+  question="How spicy was the book?"
+  value={metrics.spice}
+  onChange={(value) => updateMetric("spice", value)}
+/>
 
           <ScoreSlider label="Chemistry" question="How strong was the chemistry?" value={metrics.chemistry} onChange={(value) => updateMetric("chemistry", value)} />
           <ScoreSlider label="Tension" question="How much romantic tension was there?" value={metrics.tension} onChange={(value) => updateMetric("tension", value)} />
