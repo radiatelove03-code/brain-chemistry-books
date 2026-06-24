@@ -3,7 +3,6 @@ import { supabase } from "./lib/supabase"
 import Auth from "./Auth"
 import "./App.css"
 import ProgressBar from "./components/ProgressBar"
-import ReaderCard from "./components/ReaderCard"
 import ReadingHeatMap from "./components/ReadingHeatMap"
 import CommunityChallengeCard from "./components/CommunityChallengeCard"
 import YearInBooksPanel from "./components/YearInBooksPanel"
@@ -25,6 +24,8 @@ import PublicProfilePreviewPage from "./components/PublicProfilePreviewPage"
 import ReaderShelves from "./components/ReaderShelves"
 import AnalyticsPage from "./components/AnalyticsPage"
 import AddBookPage from "./components/AddBookPage"
+import FindReadersPage from "./components/FindReadersPage"
+import PublicProfileViewPage from "./components/PublicProfileViewPage"
 
 const tropeOptions = [
   "Small Town",
@@ -386,6 +387,10 @@ function App() {
   const [publicProfileBooks, setPublicProfileBooks] = useState([])
   const [publicProfileShelf, setPublicProfileShelf] = useState("reading")
   const [profilePreviewShelf, setProfilePreviewShelf] = useState("reading")
+  const [readerSearch, setReaderSearch] = useState("")
+  const [readerSearchResults, setReaderSearchResults] = useState([])
+  const [readerSearchLoading, setReaderSearchLoading] = useState(false)
+  const [readerSearchMessage, setReaderSearchMessage] = useState("")
 
 
   const [readingGoals, setReadingGoals] = useState(() => {
@@ -4503,42 +4508,95 @@ loadFollowStats(currentUser.id, currentUser)
     await loadFollowStats(data.user_id, currentUser)
     setPublicProfileLoading(false)
   }
+async function searchReaders(searchTerm) {
+  const cleanSearch = String(searchTerm || "").trim().toLowerCase()
 
-  async function toggleFollowPublicProfile() {
-    if (!user) {
-      setPublicProfileMessage("Log in to follow this reader.")
-      return
+  if (!user) {
+    setReaderSearchResults([])
+    setReaderSearchMessage("Log in to search for readers.")
+    return
+  }
+
+  if (cleanSearch.length < 2) {
+    setReaderSearchResults([])
+    setReaderSearchMessage("")
+    return
+  }
+
+  setReaderSearchLoading(true)
+  setReaderSearchMessage("")
+
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("user_id, username, display_name, avatar_url, profile_data, stats_data")
+    .eq("is_public", true)
+    .neq("user_id", user.id)
+    .or(`username.ilike.%${cleanSearch}%,display_name.ilike.%${cleanSearch}%`)
+    .order("updated_at", { ascending: false })
+    .limit(20)
+
+  if (error) {
+    setReaderSearchResults([])
+    setReaderSearchMessage(error.message)
+    setReaderSearchLoading(false)
+    return
+  }
+
+  const readers = (data || []).map((reader) => ({
+    userId: reader.user_id,
+    username: reader.username,
+    displayName: reader.display_name,
+    avatarUrl: reader.avatar_url,
+    profileData: reader.profile_data || {},
+    statsData: reader.stats_data || {},
+  }))
+
+  setReaderSearchResults(readers)
+  setReaderSearchMessage(readers.length ? "" : "No public readers found yet.")
+  setReaderSearchLoading(false)
+}
+
+async function openReaderProfile(username) {
+  setPublicProfileView(null)
+  setPublicProfileBooks([])
+  setPublicProfileMessage("")
+  setPublicProfileLoading(true)
+  setStep("publicProfileView")
+
+  try {
+    await loadPublicProfileByUsername(username, user)
+  } catch (error) {
+    setPublicProfileMessage(error.message || "This profile could not load.")
+    setPublicProfileView(null)
+    setPublicProfileBooks([])
+    setPublicProfileLoading(false)
+  }
+}
+
+async function toggleFollowPublicProfile() {
+  if (!user) {
+    setPublicProfileMessage("Log in to follow this reader.")
+    return
+  }
+
+  if (!publicProfileView?.userId || publicProfileView.userId === user.id) return
+
+  const targetUserId = publicProfileView.userId
+  const targetUsername = publicProfileView.username || "reader"
+
+  if (followStats.isFollowing) {
+ const { error } = await supabase
+  .from("follows")
+  .upsert(
+    {
+      follower_id: user.id,
+      following_id: publicProfileView.userId,
+    },
+    {
+      onConflict: "follower_id,following_id",
+      ignoreDuplicates: true,
     }
-
-    if (!publicProfileView?.userId || publicProfileView.userId === user.id) return
-
-    if (followStats.isFollowing) {
-      const { error } = await supabase
-        .from("follows")
-        .delete()
-        .eq("follower_id", user.id)
-        .eq("following_id", publicProfileView.userId)
-
-      if (error) {
-        setPublicProfileMessage(error.message)
-        return
-      }
-
-      setFollowStats((current) => ({
-        ...current,
-        followers: Math.max(0, Number(current.followers || 0) - 1),
-        isFollowing: false,
-      }))
-      setPublicProfileMessage(`Unfollowed @${publicProfileView.username}.`)
-      return
-    }
-
-    const { error } = await supabase
-      .from("follows")
-      .insert({
-        follower_id: user.id,
-        following_id: publicProfileView.userId,
-      })
+  )
 
     if (error) {
       setPublicProfileMessage(error.message)
@@ -4547,11 +4605,40 @@ loadFollowStats(currentUser.id, currentUser)
 
     setFollowStats((current) => ({
       ...current,
-      followers: Number(current.followers || 0) + 1,
-      isFollowing: true,
+      followers: Math.max(0, Number(current?.followers || 0) - 1),
+      isFollowing: false,
     }))
-    setPublicProfileMessage(`Following @${publicProfileView.username} 🌸`)
+
+    setPublicProfileMessage(`Unfollowed @${targetUsername}.`)
+    return
   }
+
+  const { error } = await supabase
+    .from("follows")
+    .upsert(
+      {
+        follower_id: user.id,
+        following_id: targetUserId,
+      },
+      {
+        onConflict: "follower_id,following_id",
+        ignoreDuplicates: true,
+      }
+    )
+
+  if (error) {
+    setPublicProfileMessage(error.message)
+    return
+  }
+
+  setFollowStats((current) => ({
+    ...current,
+    followers: Number(current?.followers || 0) + 1,
+    isFollowing: true,
+  }))
+
+  setPublicProfileMessage(`Following @${targetUsername} 🌸`)
+}
 
   function getActivityTypeForReview(reviewItem, wasEditing = false) {
     const status = reviewItem?.bookInfo?.status
@@ -5027,6 +5114,7 @@ loadFollowStats(currentUser.id, currentUser)
     readingSummary: "Reading Summary",
     reviewGraphic: "Review Graphic",
     viewReview: "Book Review",
+    findReaders: "Find Readers",
   }
 
   function goHome() {
@@ -5053,6 +5141,7 @@ loadFollowStats(currentUser.id, currentUser)
       readingSummary: "viewReview",
       reviewGraphic: "viewReview",
       viewReview: "library",
+      findReaders: "home",
     }
 
     setStep(backStepByPage[step] || "home")
@@ -5258,6 +5347,19 @@ loadFollowStats(currentUser.id, currentUser)
     toggleActivityLike={toggleActivityLike}
   />
 )}
+{step === "findReaders" && (
+  <FindReadersPage
+    user={user}
+    readerSearch={readerSearch}
+    setReaderSearch={setReaderSearch}
+    readerSearchResults={readerSearchResults}
+    readerSearchLoading={readerSearchLoading}
+    readerSearchMessage={readerSearchMessage}
+    searchReaders={searchReaders}
+    openReaderProfile={openReaderProfile}
+    setStep={setStep}
+  />
+)}
 
      {step === "profile" && (
   <ProfilePage
@@ -5290,11 +5392,12 @@ loadFollowStats(currentUser.id, currentUser)
 )}
 
 
-      {step === "publicProfileView" && (
+     {step === "publicProfileView" && (
   <PublicProfileViewPage
     publicProfileView={publicProfileView}
     publicProfileLoading={publicProfileLoading}
     publicProfileMessage={publicProfileMessage}
+    onUpdateProfile={() => {}}
     user={user}
     followStats={followStats}
     toggleFollowPublicProfile={toggleFollowPublicProfile}

@@ -54,6 +54,7 @@ function HomePage({
         Community Challenges
       </button>
       <button onClick={() => setStep("profile")}>Reader Profile</button>
+      <button onClick={() => setStep("findReaders")}>Find Readers</button>
 
       {savedReviews.length > 0 && (
         <div className="score-card">
