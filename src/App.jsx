@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react"
 import { supabase } from "./lib/supabase"
 import Auth from "./Auth"
 import "./App.css"
+import { SpeedInsights } from "@vercel/speed-insights/react"
 import ProgressBar from "./components/ProgressBar"
 import ReadingHeatMap from "./components/ReadingHeatMap"
 import CommunityChallengeCard from "./components/CommunityChallengeCard"
@@ -6423,6 +6424,7 @@ if (activityOwnerId && activityOwnerId !== user.id) {
           {saveMessage && <p>{saveMessage}</p>}
         </section>
       )}
+      <SpeedInsights />
     </main>
   )
 }
