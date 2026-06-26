@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react"
 import { supabase } from "./lib/supabase"
 import Auth from "./Auth"
+import { SpeedInsights } from "@vercel/speed-insights/react"
 import "./App.css"
 import ProgressBar from "./components/ProgressBar"
 import ReadingHeatMap from "./components/ReadingHeatMap"
@@ -6423,6 +6424,7 @@ if (activityOwnerId && activityOwnerId !== user.id) {
           {saveMessage && <p>{saveMessage}</p>}
         </section>
       )}
+      <SpeedInsights />
     </main>
   )
 }
